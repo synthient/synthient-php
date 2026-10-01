@@ -8,10 +8,7 @@ use Generator;
 use IteratorAggregate;
 use LogicException;
 use Psr\Http\Message\StreamInterface;
-use RuntimeException;
-use Synthient\Exception\ConnectionException;
 use Synthient\Exception\SynthientException;
-use Synthient\Exception\TimeoutException;
 use Synthient\Internal\Decoder;
 
 /**
@@ -57,16 +54,7 @@ final class EventStream implements IteratorAggregate
         try {
             $buffer = '';
             while (!$this->body->eof()) {
-                try {
-                    $chunk = $this->body->read(65536);
-                } catch (RuntimeException $e) {
-                    throw $this->body->getMetadata('timed_out') === true
-                        ? new TimeoutException('synthient: stream read timed out', 0, $e)
-                        : new ConnectionException('synthient: stream read failed', 0, $e);
-                }
-                if ($chunk === '' && $this->body->getMetadata('timed_out') === true) {
-                    throw new TimeoutException('synthient: stream read timed out');
-                }
+                $chunk = $this->body->read(65536);
                 $lines = explode("\n", $buffer . $chunk);
                 $buffer = array_pop($lines);
                 foreach ($lines as $line) {

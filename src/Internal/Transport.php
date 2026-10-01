@@ -18,7 +18,6 @@ use InvalidArgumentException;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\StreamInterface;
 use Random\Randomizer;
-use RuntimeException;
 use Synthient\Exception\ApiException;
 use Synthient\Exception\ConnectionException;
 use Synthient\Exception\SynthientException;
@@ -92,7 +91,7 @@ final class Transport
         if ($status < 200 || $status >= 300) {
             throw $this->apiError($response);
         }
-        $json = $this->read($response->getBody(), self::MAX_RESPONSE_SIZE);
+        $json = self::read($response->getBody(), self::MAX_RESPONSE_SIZE);
         if ($class === null) {
             return null;
         }
@@ -114,7 +113,7 @@ final class Transport
             throw $this->apiError($response);
         }
 
-        return $response->getBody();
+        return new Body($response->getBody());
     }
 
     /**
@@ -158,7 +157,7 @@ final class Transport
             }
             $status = $response->getStatusCode();
             if ($status === 200) {
-                return $response->getBody();
+                return new Body($response->getBody());
             }
             $response->getBody()->close();
             if ($status < 300 || $status >= 400 || !$response->hasHeader('Location')) {
@@ -322,25 +321,14 @@ final class Transport
     /**
      * Reads at most $limit + 1 bytes, so a caller can tell an oversized body apart.
      */
-    private function read(StreamInterface $body, int $limit): string
+    private static function read(StreamInterface $body, int $limit): string
     {
+        $body = new Body($body);
         $data = '';
         try {
             while (!$body->eof() && \strlen($data) <= $limit) {
-                $chunk = $body->read(65536);
-                if ($chunk === '' && $body->getMetadata('timed_out') === true) {
-                    throw new TimeoutException('synthient: reading the response timed out');
-                }
-                $data .= $chunk;
+                $data .= $body->read(min(65536, $limit + 1 - \strlen($data)));
             }
-        } catch (RuntimeException $e) {
-            if ($e instanceof SynthientException) {
-                throw $e;
-            }
-
-            throw $body->getMetadata('timed_out') === true
-                ? new TimeoutException('synthient: reading the response timed out', 0, $e)
-                : new ConnectionException('synthient: reading the response failed', 0, $e);
         } finally {
             $body->close();
         }
@@ -355,7 +343,7 @@ final class Transport
         $retryAfter = self::parseRetryAfter($response->getHeaderLine('Retry-After'));
         $headers = $response->getHeaders();
         try {
-            $body = substr($this->read($response->getBody(), self::MAX_ERROR_SIZE), 0, self::MAX_ERROR_SIZE);
+            $body = substr(self::read($response->getBody(), self::MAX_ERROR_SIZE), 0, self::MAX_ERROR_SIZE);
         } catch (SynthientException $e) {
             return new ApiException($status, requestId: $requestId, retryAfter: $retryAfter, headers: $headers, previous: $e);
         }
