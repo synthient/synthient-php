@@ -86,15 +86,17 @@ final class Transport
         array $query = [],
         ?array $body = null,
     ): ?object {
-        $response = $this->send($method, $path, $policy, 'application/json', false, $query, $body);
+        $response = $this->send($method, $path, $policy, false, $query, $body);
         $status = $response->getStatusCode();
         if ($status < 200 || $status >= 300) {
             throw $this->apiError($response);
         }
-        $json = self::read($response->getBody(), self::MAX_RESPONSE_SIZE);
         if ($class === null) {
+            $response->getBody()->close();
+
             return null;
         }
+        $json = self::read($response->getBody(), self::MAX_RESPONSE_SIZE);
         if (\strlen($json) > self::MAX_RESPONSE_SIZE) {
             throw new SynthientException('synthient: response body exceeds ' . self::MAX_RESPONSE_SIZE . ' bytes');
         }
@@ -108,7 +110,7 @@ final class Transport
     public function openStream(string $path): StreamInterface
     {
         $this->requireStreaming();
-        $response = $this->send('GET', $path, RetryPolicy::Transient, 'application/x-ndjson', true);
+        $response = $this->send('GET', $path, RetryPolicy::Transient, true);
         if ($response->getStatusCode() !== 200) {
             throw $this->apiError($response);
         }
@@ -121,7 +123,7 @@ final class Transport
      */
     public function downloadUrl(string $path): string
     {
-        $response = $this->send('GET', $path, RetryPolicy::Transient, 'application/json', false);
+        $response = $this->send('GET', $path, RetryPolicy::Transient, false);
         $status = $response->getStatusCode();
         if ($status >= 400) {
             throw $this->apiError($response);
@@ -213,7 +215,6 @@ final class Transport
         string $method,
         string $path,
         RetryPolicy $policy,
-        string $accept,
         bool $stream,
         array $query = [],
         ?array $body = null,
@@ -222,7 +223,11 @@ final class Transport
         if ($query !== []) {
             $url .= '?' . http_build_query($query, '', '&', PHP_QUERY_RFC3986);
         }
-        $headers = ['X-Api-Key' => $this->apiKey, 'User-Agent' => $this->userAgent, 'Accept' => $accept];
+        $headers = [
+            'X-Api-Key' => $this->apiKey,
+            'User-Agent' => $this->userAgent,
+            'Accept' => $stream ? 'application/x-ndjson' : 'application/json',
+        ];
         $payload = null;
         if ($body !== null) {
             $headers['Content-Type'] = 'application/json';
