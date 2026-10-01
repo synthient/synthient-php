@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Synthient\Tests;
 
 /**
- * Response bodies shaped like the API's, with an unknown field in each object to prove
- * additive fields are ignored.
+ * Response bodies shaped like the API's. ipInfo() carries unknown fields to prove additive
+ * fields are ignored.
  */
 final class Fixtures
 {
