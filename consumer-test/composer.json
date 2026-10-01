@@ -1,0 +1,21 @@
+{
+    "name": "synthient/consumer-test",
+    "description": "Installs the archived package outside the checkout and exercises it.",
+    "type": "project",
+    "license": "Apache-2.0",
+    "require": {
+        "synthient/synthient-php": "1.0.0"
+    },
+    "repositories": [
+        {
+            "type": "path",
+            "url": "package",
+            "options": {
+                "symlink": false,
+                "versions": {
+                    "synthient/synthient-php": "1.0.0"
+                }
+            }
+        }
+    ]
+}
