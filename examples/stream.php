@@ -26,12 +26,10 @@ while (true) {
         } finally {
             $events->close();
         }
-    } catch (ApiException $e) {
-        if (in_array($e->statusCode, [401, 403], true)) {
+    } catch (SynthientException $e) {
+        if ($e instanceof ApiException && in_array($e->statusCode, [401, 403], true)) {
             exit("{$e->getMessage()}: check the key and its PROXY_FIREHOSE scope\n");
         }
-        fwrite(STDERR, "{$e->getMessage()}, reconnecting\n");
-    } catch (SynthientException $e) {
         fwrite(STDERR, "{$e->getMessage()}, reconnecting\n");
     }
     // Stay under the limit of 30 stream connections a minute.
