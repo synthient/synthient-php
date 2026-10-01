@@ -1,0 +1,30 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Synthient\Event;
+
+use DateTimeImmutable;
+
+/**
+ * A TLS handshake captured by a Helios honeypot.
+ */
+final readonly class HeliosHttpsEvent
+{
+    /**
+     * @param string $domain the host the tunnel was opened to
+     * @param int $port the destination port
+     * @param TlsClientHello|null $details null when the sensor could not parse the handshake
+     * @param string|null $raw always null, because the sensors do not capture handshake bytes
+     */
+    public function __construct(
+        public DateTimeImmutable $timestamp,
+        public int $tunnelId,
+        public string $domain,
+        public int $port,
+        public string $protocol,
+        public HeliosMeta $meta,
+        public ?TlsClientHello $details = null,
+        public ?string $raw = null,
+    ) {}
+}

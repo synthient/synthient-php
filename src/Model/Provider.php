@@ -1,0 +1,21 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Synthient\Model;
+
+use DateTimeImmutable;
+use Synthient\Internal\Wire;
+
+/**
+ * A proxy or VPN provider seen using an address.
+ */
+final readonly class Provider
+{
+    public function __construct(
+        #[Wire(name: 'provider')]
+        public string $name,
+        public string $type,
+        public DateTimeImmutable $lastSeen,
+    ) {}
+}
