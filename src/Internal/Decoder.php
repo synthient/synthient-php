@@ -142,7 +142,7 @@ final class Decoder
      *
      * @return list<array{param: string, key: string, type: string, nullable: bool}>
      */
-    private static function fields(string $class): array
+    public static function fields(string $class): array
     {
         $constructor = (new ReflectionClass($class))->getConstructor();
         $fields = [];

@@ -5,20 +5,17 @@ declare(strict_types=1);
 namespace Synthient\Tests;
 
 use DateTimeImmutable;
-use GuzzleHttp\Client as GuzzleClient;
-use GuzzleHttp\HandlerStack;
-use GuzzleHttp\Middleware;
 use GuzzleHttp\Promise\Create;
 use GuzzleHttp\Promise\PromiseInterface;
 use GuzzleHttp\Psr7\Response;
 use Psr\Http\Message\RequestInterface;
 use ReflectionClass;
-use ReflectionNamedType;
+use ReflectionParameter;
 use Synthient\Client;
 use Synthient\Enum;
 use Synthient\Event;
+use Synthient\Internal\Decoder;
 use Synthient\Internal\IpBatch;
-use Synthient\Internal\Wire;
 use Synthient\Model;
 
 /**
@@ -95,11 +92,8 @@ final class ConformanceTest extends TestCase
      */
     private static function spec(): array
     {
-        $spec = json_decode((string) file_get_contents(__DIR__ . '/../.sdkgen/openapi.json'), true, 512, JSON_THROW_ON_ERROR);
-        self::assertIsArray($spec);
-
-        /** @var array<string, mixed> $spec */
-        return self::$spec ??= $spec;
+        /** @var array<string, mixed> */
+        return self::$spec ??= json_decode((string) file_get_contents(__DIR__ . '/../.sdkgen/openapi.json'), true, 512, JSON_THROW_ON_ERROR);
     }
 
     /**
@@ -131,10 +125,11 @@ final class ConformanceTest extends TestCase
 
     public function testModelsMatchTheirSchemas(): void
     {
+        $schemas = self::schemas();
         foreach (self::MODELS as $name => $class) {
-            $this->assertMatchesSchema($class, self::schemas()[$name], $name);
+            $this->assertMatchesSchema($class, $schemas[$name], $name);
         }
-        $details = self::schemas()['HoneypotHTTPStreamEntry']['properties']['details'] ?? null;
+        $details = $schemas['HoneypotHTTPStreamEntry']['properties']['details'] ?? null;
         self::assertIsArray($details);
         $this->assertMatchesSchema(Event\HttpRequestDetails::class, $details, 'HoneypotHTTPStreamEntry.details');
     }
@@ -190,16 +185,14 @@ final class ConformanceTest extends TestCase
                 default => self::json(200, Fixtures::domain()),
             });
         };
-        $stack = HandlerStack::create($handler);
-        $stack->push(Middleware::history($this->history));
-        $client = new Client(apiKey: self::KEY, baseUrl: 'https://api.test/api/v4', httpClient: new GuzzleClient(['handler' => $stack]));
+        $client = $this->client($handler);
 
         $client->account();
         $client->health();
         $client->lookupIp('8.8.8.8');
         $client->lookupIps(['8.8.8.8']);
         $client->lookupDomain('example.com');
-        foreach ([$client->proxies, $client->anonymizers, $client->torrents, $client->ja4t, $client->heliosHttp, $client->heliosHttps, $client->heliosDns, $client->heliosAdb] as $feed) {
+        foreach (self::feeds($client) as $feed) {
             $feed->listExports();
             $feed->exportMeta('2026-05-03');
             $feed->exportMeta('2026-05-03/7');
@@ -226,28 +219,19 @@ final class ConformanceTest extends TestCase
         $required = $schema['required'] ?? [];
         \assert(\is_array($required));
         $keys = [];
-        foreach ((new ReflectionClass($class))->getConstructor()?->getParameters() ?? [] as $param) {
-            $wire = ($param->getAttributes(Wire::class)[0] ?? null)?->newInstance();
-            $key = $wire->name ?? strtolower((string) preg_replace('/[A-Z]/', '_$0', $param->getName()));
+        foreach (Decoder::fields($class) as ['param' => $param, 'key' => $key, 'type' => $type, 'nullable' => $nullable]) {
             $keys[] = $key;
             $at = "{$name}.{$key}";
             self::assertArrayHasKey($key, $properties, "{$at} is not in the spec");
             $definition = $properties[$key];
             \assert(\is_array($definition));
-            $type = $param->getType();
-            self::assertInstanceOf(ReflectionNamedType::class, $type);
 
-            self::assertSame(!\in_array($key, $required, true) || ($definition['nullable'] ?? false), $type->allowsNull(), "{$at} nullability");
-            if ($type->allowsNull()) {
-                self::assertTrue($param->isDefaultValueAvailable(), "{$at} should default to null");
+            self::assertSame(!\in_array($key, $required, true) || ($definition['nullable'] ?? false), $nullable, "{$at} nullability");
+            if ($nullable) {
+                self::assertTrue((new ReflectionParameter([$class, '__construct'], $param))->isDefaultValueAvailable(), "{$at} should default to null");
             }
-            $phpType = match (true) {
-                $wire?->list !== null => "list<{$wire->list}>",
-                $wire?->map !== null => "map<{$wire->map}>",
-                default => $type->getName(),
-            };
             $timestamp = ($definition['type'] ?? null) === 'integer' && \in_array($key, ['timestamp', 'last_seen', 'created_at', 'date'], true);
-            self::assertContains($phpType, $timestamp ? [DateTimeImmutable::class] : self::phpTypes($definition), "{$at} type");
+            self::assertContains($type, $timestamp ? [DateTimeImmutable::class] : self::phpTypes($definition), "{$at} type");
         }
         $missing = array_diff(array_keys($properties), $keys);
         self::assertSame([], array_values($missing), "{$name} is missing properties");
