@@ -28,9 +28,9 @@ jobs:
           tools: composer:v2
       - run: composer update --no-interaction --no-progress
       - name: Check formatting
-        run: vendor/bin/php-cs-fixer check --diff
+        run: composer lint:cs
       - if: ${{ !cancelled() }}
-        run: vendor/bin/phpstan analyse --no-progress
+        run: composer lint:phpstan
       - name: Analyse the tests
         if: ${{ !cancelled() }}
-        run: vendor/bin/phpstan analyse --no-progress --level 6 tests
+        run: composer lint:phpstan-tests

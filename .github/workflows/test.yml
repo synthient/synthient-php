@@ -42,7 +42,7 @@ jobs:
           coverage: none
           tools: composer:v2
       - run: composer update --no-interaction --no-progress ${{ matrix.composer-args }}
-      - run: vendor/bin/phpunit
+      - run: composer test
 
   package:
     runs-on: ubuntu-latest

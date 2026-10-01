@@ -46,10 +46,13 @@
     "scripts": {
         "test": "phpunit",
         "lint": [
-            "php-cs-fixer check --diff",
-            "phpstan analyse --no-progress",
-            "phpstan analyse --no-progress --level 6 tests"
+            "@lint:cs",
+            "@lint:phpstan",
+            "@lint:phpstan-tests"
         ],
+        "lint:cs": "php-cs-fixer check --diff",
+        "lint:phpstan": "phpstan analyse --no-progress",
+        "lint:phpstan-tests": "phpstan analyse --no-progress --level 6 tests",
         "check-package": "scripts/check-package.sh"
     },
     "archive": {
