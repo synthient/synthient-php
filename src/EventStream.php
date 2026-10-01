@@ -55,12 +55,15 @@ final class EventStream implements IteratorAggregate
             $buffer = '';
             while (!$this->body->eof()) {
                 $chunk = $this->body->read(65536);
-                $lines = explode("\n", $buffer . $chunk);
-                $buffer = array_pop($lines);
-                foreach ($lines as $line) {
-                    $line = trim($line);
-                    if ($line !== '') {
-                        yield Decoder::decode($this->event, $line);
+                $buffer .= $chunk;
+                if (str_contains($chunk, "\n")) {
+                    $lines = explode("\n", $buffer);
+                    $buffer = array_pop($lines);
+                    foreach ($lines as $line) {
+                        $line = trim($line);
+                        if ($line !== '') {
+                            yield Decoder::decode($this->event, $line);
+                        }
                     }
                 }
                 if (\strlen($buffer) > self::MAX_EVENT_SIZE) {
