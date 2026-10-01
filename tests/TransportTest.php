@@ -31,7 +31,7 @@ final class TransportTest extends TestCase
 
     public function testFreeRequestsReuseConnections(): void
     {
-        $account = ScriptedServer::response(200, (string) json_encode(Fixtures::account()));
+        $account = ScriptedServer::json(200, Fixtures::account());
         $server = new ScriptedServer([[['read' => true], ['write' => $account], ['read' => true], ['write' => $account]]]);
         $client = $this->realClient($server);
         $client->account();
@@ -43,17 +43,13 @@ final class TransportTest extends TestCase
     public function testBilledLookupIsNotResentWhenAReusedConnectionDrops(): void
     {
         $server = new ScriptedServer([
-            [['read' => true], ['write' => ScriptedServer::response(200, (string) json_encode(Fixtures::account()))], ['read' => true], ['close' => true]],
+            [['read' => true], ['write' => ScriptedServer::json(200, Fixtures::account())], ['read' => true], ['close' => true]],
             [['read' => true], ['close' => true]],
-            [['read' => true], ['write' => ScriptedServer::response(200, (string) json_encode(Fixtures::ipInfo()))]],
+            [['read' => true], ['write' => ScriptedServer::json(200, Fixtures::ipInfo())]],
         ]);
         $client = $this->realClient($server);
         $client->account();
-        try {
-            $client->lookupIp('8.8.8.8');
-            self::fail('expected a connection error');
-        } catch (ConnectionException) {
-        }
+        self::thrown(ConnectionException::class, static fn() => $client->lookupIp('8.8.8.8'));
 
         $requests = $server->requests();
         self::assertSame(['GET /api/v4/account/me HTTP/1.1', 'GET /api/v4/lookup/ip/8.8.8.8 HTTP/1.1'], array_column($requests, 'line'));
@@ -105,11 +101,7 @@ final class TransportTest extends TestCase
     {
         $server = new ScriptedServer([[['read' => true], ['sleep' => 5]]]);
         $start = hrtime(true);
-        try {
-            $this->realClient($server, timeout: 0.5, maxRetries: 0)->account();
-            self::fail('expected a timeout');
-        } catch (TimeoutException) {
-        }
+        self::thrown(TimeoutException::class, fn() => $this->realClient($server, timeout: 0.5, maxRetries: 0)->account());
 
         self::assertLessThan(3, (hrtime(true) - $start) / 1e9);
     }

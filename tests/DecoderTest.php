@@ -10,7 +10,7 @@ use Synthient\Internal\Decoder;
 use Synthient\Model\Account;
 use Synthient\Model\IpInfo;
 
-final class DecoderTest extends \PHPUnit\Framework\TestCase
+final class DecoderTest extends TestCase
 {
     /**
      * @return iterable<string, array{callable(array<string, mixed>): array<string, mixed>, string}>
@@ -72,12 +72,8 @@ final class DecoderTest extends \PHPUnit\Framework\TestCase
     {
         $body = Fixtures::ipInfo();
         $body['ip'] = ['secret-value'];
-        try {
-            Decoder::decode(IpInfo::class, json_encode($body, JSON_THROW_ON_ERROR));
-            self::fail('expected a decode error');
-        } catch (SynthientException $e) {
-            self::assertStringNotContainsString('secret-value', $e->getMessage());
-        }
+        $e = self::thrown(SynthientException::class, static fn() => Decoder::decode(IpInfo::class, json_encode($body, JSON_THROW_ON_ERROR)));
+        self::assertStringNotContainsString('secret-value', $e->getMessage());
     }
 
     /**
@@ -124,12 +120,8 @@ final class DecoderTest extends \PHPUnit\Framework\TestCase
         foreach (['2026-02-30T00:00:00Z', '2026-09-28 19:04:52Z', '2026-09-28T19:04:52', 'now'] as $value) {
             $body = Fixtures::account();
             $body['api_key']['created_at'] = $value;
-            try {
-                Decoder::decode(Account::class, json_encode($body, JSON_THROW_ON_ERROR));
-                self::fail("accepted {$value}");
-            } catch (SynthientException $e) {
-                self::assertStringContainsString('api_key.created_at', $e->getMessage());
-            }
+            $e = self::thrown(SynthientException::class, static fn() => Decoder::decode(Account::class, json_encode($body, JSON_THROW_ON_ERROR)));
+            self::assertStringContainsString('api_key.created_at', $e->getMessage(), $value);
         }
     }
 

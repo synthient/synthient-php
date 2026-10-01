@@ -13,23 +13,18 @@ final class ErrorTest extends TestCase
 {
     private function apiError(Response $response): ApiException
     {
-        try {
-            $this->client([$response], maxRetries: 0)->lookupIp('8.8.8.8');
-        } catch (ApiException $e) {
-            return $e;
-        }
-        self::fail('expected an API error');
+        return self::thrown(ApiException::class, fn() => $this->client([$response], maxRetries: 0)->lookupIp('8.8.8.8'));
     }
 
     public function testProblemDetails(): void
     {
-        $e = $this->apiError(new Response(403, ['Content-Type' => 'application/problem+json', 'X-Request-Id' => 'abc123'], json_encode([
+        $e = $this->apiError(self::json(403, [
             'type' => 'https://docs.synthient.com/errors/forbidden',
             'title' => 'Forbidden',
             'status' => 403,
             'detail' => 'missing scope',
             'instance' => 'ignored',
-        ], JSON_THROW_ON_ERROR)));
+        ], ['Content-Type' => 'application/problem+json', 'X-Request-Id' => 'abc123']));
 
         self::assertSame(403, $e->statusCode);
         self::assertSame(403, $e->getCode());
@@ -42,13 +37,13 @@ final class ErrorTest extends TestCase
 
     public function testValidationErrors(): void
     {
-        $e = $this->apiError(new Response(422, ['Content-Type' => 'application/problem+json'], json_encode([
+        $e = $this->apiError(self::json(422, [
             'type' => 'about:blank',
             'title' => 'Unprocessable Entity',
             'status' => 422,
             'errors' => ['ip_address' => ['must be a public address']],
             'instance' => 'f00d',
-        ], JSON_THROW_ON_ERROR)));
+        ], ['Content-Type' => 'application/problem+json']));
 
         self::assertSame(['ip_address' => ['must be a public address']], $e->errors);
         self::assertNull($e->detail);
@@ -109,12 +104,8 @@ final class ErrorTest extends TestCase
             new Response(200, [], ''),
             new Response(200, [], '{"ip":"' . str_repeat('a', Transport::MAX_RESPONSE_SIZE) . '"}'),
         ] as $response) {
-            try {
-                $this->client([$response])->lookupIp('8.8.8.8');
-                self::fail('expected a response error');
-            } catch (SynthientException $e) {
-                self::assertNotInstanceOf(ApiException::class, $e);
-            }
+            $e = self::thrown(SynthientException::class, fn() => $this->client([$response])->lookupIp('8.8.8.8'));
+            self::assertNotInstanceOf(ApiException::class, $e);
         }
     }
 

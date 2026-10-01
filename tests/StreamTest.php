@@ -103,12 +103,8 @@ final class StreamTest extends TestCase
     public function testConnectErrorsAreThrownBeforeIteration(): void
     {
         foreach ([self::problem(403), self::problem(429), new Response(204)] as $response) {
-            try {
-                $this->client([$response])->proxies->stream();
-                self::fail('expected an API error');
-            } catch (ApiException $e) {
-                self::assertSame($response->getStatusCode(), $e->statusCode);
-            }
+            $e = self::thrown(ApiException::class, fn() => $this->client([$response])->proxies->stream());
+            self::assertSame($response->getStatusCode(), $e->statusCode);
         }
     }
 

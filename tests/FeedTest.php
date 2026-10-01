@@ -18,16 +18,7 @@ final class FeedTest extends TestCase
     public function testFeedRoutes(): void
     {
         $client = $this->client(array_map(static fn() => self::json(200, Fixtures::exportMeta()), range(1, 8)));
-        $feeds = [
-            'proxies' => $client->proxies,
-            'anonymizers' => $client->anonymizers,
-            'torrents' => $client->torrents,
-            'ja4t' => $client->ja4t,
-            'helio/http' => $client->heliosHttp,
-            'helio/https' => $client->heliosHttps,
-            'helio/dns' => $client->heliosDns,
-            'helio/adb' => $client->heliosAdb,
-        ];
+        $feeds = self::feeds($client);
         foreach ($feeds as $feed) {
             $feed->exportMeta('latest');
         }
@@ -71,11 +62,7 @@ final class FeedTest extends TestCase
     public function testRejectsInvalidExportIds(string $id): void
     {
         $client = $this->client([]);
-        try {
-            $client->proxies->exportMeta($id);
-            self::fail('expected an invalid ID error');
-        } catch (InvalidArgumentException) {
-        }
+        self::thrown(InvalidArgumentException::class, static fn() => $client->proxies->exportMeta($id));
         self::assertSame([], $this->history);
     }
 

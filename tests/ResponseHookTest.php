@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace Synthient\Tests;
 
-use GuzzleHttp\Exception\ConnectException;
-use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use RuntimeException;
+use Synthient\Exception\SynthientException;
 use Synthient\Internal\Transport;
 use Synthient\RateLimit;
 use Synthient\ResponseMetadata;
@@ -30,10 +29,7 @@ final class ResponseHookTest extends TestCase
 
         $client->account();
         $client->proxies->download('latest')->close();
-        try {
-            $client->account();
-        } catch (\Synthient\Exception\SynthientException) {
-        }
+        self::thrown(SynthientException::class, $client->account(...));
 
         self::assertSame([503, 200, 307, 200], array_map(static fn(ResponseMetadata $m) => $m->statusCode, $seen));
         self::assertSame(['r1', 'r2', 'r3', null], array_map(static fn(ResponseMetadata $m) => $m->requestId, $seen));
@@ -46,7 +42,7 @@ final class ResponseHookTest extends TestCase
     {
         $calls = 0;
         $client = $this->client(
-            [new ConnectException('refused', new Request('GET', 'https://api.test')), self::json(200, Fixtures::account())],
+            [self::dropped('refused'), self::json(200, Fixtures::account())],
             responseHook: static function () use (&$calls): void {
                 $calls++;
             },

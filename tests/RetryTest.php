@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Synthient\Tests;
 
 use GuzzleHttp\Exception\ConnectException;
-use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Synthient\Exception\ApiException;
@@ -68,23 +67,15 @@ final class RetryTest extends TestCase
 
     public function testLongRetryAfterIsNotWaitedFor(): void
     {
-        try {
-            $this->client([self::problem(429, ['Retry-After' => '120']), self::json(200, Fixtures::account())])->account();
-            self::fail('expected a rate limit error');
-        } catch (ApiException $e) {
-            self::assertSame(120, $e->retryAfter);
-        }
+        $e = self::thrown(ApiException::class, fn() => $this->client([self::problem(429, ['Retry-After' => '120']), self::json(200, Fixtures::account())])->account());
+        self::assertSame(120, $e->retryAfter);
         self::assertCount(1, $this->history);
         self::assertSame([], $this->sleeps);
     }
 
     public function testZeroRetries(): void
     {
-        try {
-            $this->client([self::problem(503), self::json(200, Fixtures::account())], maxRetries: 0)->account();
-            self::fail('expected a server error');
-        } catch (ApiException) {
-        }
+        self::thrown(ApiException::class, fn() => $this->client([self::problem(503), self::json(200, Fixtures::account())], maxRetries: 0)->account());
         self::assertCount(1, $this->history);
     }
 
@@ -98,37 +89,33 @@ final class RetryTest extends TestCase
         self::assertSame('{"ips":["8.8.8.8","1.1.1.1"]}', (string) $this->request(1)->getBody());
     }
 
-    public function testTransportErrorsAreRetriedOnlyForFreeOperations(): void
+    public function testTransportErrorsAreRetriedForFreeOperations(): void
     {
-        $dropped = static fn(string $message = 'cURL error 56: Connection reset by peer') => new ConnectException($message, new Request('GET', 'https://api.test'));
+        $account = $this->client([self::dropped(), self::json(200, Fixtures::account())])->account();
 
-        $account = $this->client([$dropped(), self::json(200, Fixtures::account())])->account();
         self::assertSame('Ada', $account->firstName);
         self::assertCount(2, $this->history);
+    }
 
-        $this->history = [];
-        try {
-            $this->client([$dropped(), self::json(200, Fixtures::ipInfo())])->lookupIp('8.8.8.8');
-            self::fail('expected a connection error');
-        } catch (ConnectionException $e) {
-            self::assertInstanceOf(ConnectException::class, $e->getPrevious());
-        }
+    public function testTransportErrorsAreNotRetriedForBilledLookups(): void
+    {
+        $e = self::thrown(ConnectionException::class, fn() => $this->client([self::dropped(), self::json(200, Fixtures::ipInfo())])->lookupIp('8.8.8.8'));
+
+        self::assertInstanceOf(ConnectException::class, $e->getPrevious());
         self::assertCount(1, $this->history);
+    }
 
-        $this->history = [];
-        try {
-            $this->client([$dropped('cURL error 60: SSL certificate problem: unable to get local issuer certificate'), self::json(200, Fixtures::account())])->account();
-            self::fail('expected a TLS error');
-        } catch (ConnectionException) {
-        }
+    public function testTlsErrorsAreNotRetried(): void
+    {
+        self::thrown(ConnectionException::class, fn() => $this->client([self::dropped('cURL error 60: SSL certificate problem: unable to get local issuer certificate'), self::json(200, Fixtures::account())])->account());
+
         self::assertCount(1, $this->history);
+    }
 
-        $this->history = [];
-        try {
-            $this->client([$dropped('cURL error 28: Operation timed out after 10001 milliseconds'), $dropped('cURL error 28: Operation timed out')], maxRetries: 1)->account();
-            self::fail('expected a timeout');
-        } catch (TimeoutException) {
-        }
+    public function testTimeoutsAreRetriedForFreeOperations(): void
+    {
+        self::thrown(TimeoutException::class, fn() => $this->client([self::dropped('cURL error 28: Operation timed out after 10001 milliseconds'), self::dropped('cURL error 28: Operation timed out')], maxRetries: 1)->account());
+
         self::assertCount(2, $this->history);
     }
 

@@ -79,6 +79,14 @@ final class ScriptedServer
         return "{$head}\r\n{$body}";
     }
 
+    /**
+     * @param array<string, string> $headers
+     */
+    public static function json(int $status, mixed $body, array $headers = []): string
+    {
+        return self::response($status, json_encode($body, JSON_THROW_ON_ERROR), $headers);
+    }
+
     public static function chunk(string $data): string
     {
         return dechex(\strlen($data)) . "\r\n{$data}\r\n";

@@ -55,12 +55,8 @@ final class AccountTest extends TestCase
         ];
         foreach ($cases as $response) {
             $this->history = [];
-            try {
-                $this->client([$response, self::json(200, ['status' => 'ok'])])->health();
-                self::fail('expected an API error');
-            } catch (ApiException $e) {
-                self::assertSame($response->getStatusCode(), $e->statusCode);
-            }
+            $e = self::thrown(ApiException::class, fn() => $this->client([$response, self::json(200, ['status' => 'ok'])])->health());
+            self::assertSame($response->getStatusCode(), $e->statusCode);
             self::assertCount(1, $this->history);
         }
     }

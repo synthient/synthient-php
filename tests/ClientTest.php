@@ -19,12 +19,8 @@ final class ClientTest extends TestCase
     {
         putenv('SYNTHIENT_API_KEY');
         foreach ([null, '', '   '] as $key) {
-            try {
-                new Client(apiKey: $key);
-                self::fail('expected a missing key error');
-            } catch (InvalidArgumentException $e) {
-                self::assertStringContainsString('missing API key', $e->getMessage());
-            }
+            $e = self::thrown(InvalidArgumentException::class, static fn() => new Client(apiKey: $key));
+            self::assertStringContainsString('missing API key', $e->getMessage());
         }
     }
 

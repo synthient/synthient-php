@@ -4,18 +4,13 @@ declare(strict_types=1);
 
 namespace Synthient\Tests;
 
-use GuzzleHttp\Client as GuzzleClient;
 use GuzzleHttp\Cookie\CookieJar;
-use GuzzleHttp\Exception\ConnectException;
-use GuzzleHttp\Handler\MockHandler;
-use GuzzleHttp\HandlerStack;
-use GuzzleHttp\Middleware;
-use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use Synthient\Client;
 use Synthient\Exception\ApiException;
 use Synthient\Exception\ConnectionException;
 use Synthient\Exception\SynthientException;
+use Synthient\Internal\Transport;
 
 final class DownloadTest extends TestCase
 {
@@ -44,15 +39,19 @@ final class DownloadTest extends TestCase
 
     public function testDownloadSendsNoCredentialsToStorage(): void
     {
-        $stack = HandlerStack::create(new MockHandler([
-            self::redirect(self::SIGNED),
-            self::redirect('https://cdn.storage.test/a.parquet?sig=secret-signature', 302),
-            new Response(200, [], 'PAR1'),
-        ]));
-        $stack->push(Middleware::history($this->history));
-        $jar = CookieJar::fromArray(['session' => 'cookie-secret'], 'storage.test');
-        $guzzle = new GuzzleClient(['handler' => $stack, 'headers' => ['X-Default' => 'default-secret'], 'cookies' => $jar, 'auth' => ['user', 'pass']]);
-        $client = new Client(apiKey: self::KEY, baseUrl: self::BASE_URL, httpClient: $guzzle, userAgent: 'my-app/1.2');
+        $client = $this->client(
+            [
+                self::redirect(self::SIGNED),
+                self::redirect('https://cdn.storage.test/a.parquet?sig=secret-signature', 302),
+                new Response(200, [], 'PAR1'),
+            ],
+            [
+                'headers' => ['X-Default' => 'default-secret'],
+                'cookies' => CookieJar::fromArray(['session' => 'cookie-secret'], 'storage.test'),
+                'auth' => ['user', 'pass'],
+            ],
+            userAgent: 'my-app/1.2',
+        );
 
         $body = $client->proxies->download('2026-05-03');
         self::assertSame('PAR1', (string) $body);
@@ -85,13 +84,9 @@ final class DownloadTest extends TestCase
         ];
         foreach ($cases as $name => $responses) {
             $this->history = [];
-            try {
-                $this->client($responses)->proxies->download('latest');
-                self::fail("followed {$name}");
-            } catch (SynthientException $e) {
-                self::assertNotInstanceOf(ApiException::class, $e, $name);
-                self::assertStringNotContainsString('secret-signature', (string) $e, $name);
-            }
+            $e = self::thrown(SynthientException::class, fn() => $this->client($responses)->proxies->download('latest'));
+            self::assertNotInstanceOf(ApiException::class, $e, $name);
+            self::assertStringNotContainsString('secret-signature', (string) $e, $name);
             self::assertCount(\count($responses), $this->history, $name);
         }
     }
@@ -99,53 +94,33 @@ final class DownloadTest extends TestCase
     public function testRedirectLimit(): void
     {
         $responses = [self::redirect(self::SIGNED)];
-        for ($i = 0; $i <= 10; $i++) {
+        for ($i = 0; $i <= Transport::MAX_REDIRECTS; $i++) {
             $responses[] = self::redirect("https://storage.test/{$i}?sig=secret-signature", 302);
         }
-        try {
-            $this->client($responses)->proxies->download('latest');
-            self::fail('expected a redirect limit error');
-        } catch (SynthientException $e) {
-            self::assertStringContainsString('too many export redirects', $e->getMessage());
-        }
-        self::assertCount(12, $this->history);
+        $e = self::thrown(SynthientException::class, fn() => $this->client($responses)->proxies->download('latest'));
+        self::assertStringContainsString('too many export redirects', $e->getMessage());
+        self::assertCount(\count($responses), $this->history);
     }
 
     public function testErrors(): void
     {
-        try {
-            $this->client([self::problem(404, ['Retry-After' => '60'])])->proxies->download('2026-05-03');
-            self::fail('expected a not found error');
-        } catch (ApiException $e) {
-            self::assertSame(404, $e->statusCode);
-            self::assertSame(60, $e->retryAfter);
-        }
+        $e = self::thrown(ApiException::class, fn() => $this->client([self::problem(404, ['Retry-After' => '60'])])->proxies->download('2026-05-03'));
+        self::assertSame(404, $e->statusCode);
+        self::assertSame(60, $e->retryAfter);
         self::assertCount(1, $this->history);
 
-        try {
-            $this->client([self::json(200, [])])->proxies->downloadUrl('latest');
-            self::fail('expected a missing redirect error');
-        } catch (SynthientException $e) {
-            self::assertNotInstanceOf(ApiException::class, $e);
-        }
+        $e = self::thrown(SynthientException::class, fn() => $this->client([self::json(200, [])])->proxies->downloadUrl('latest'));
+        self::assertNotInstanceOf(ApiException::class, $e);
 
-        try {
-            $this->client([self::redirect(self::SIGNED), new Response(403, [], '<Error>AccessDenied secret-signature</Error>')])->proxies->download('latest');
-            self::fail('expected a storage error');
-        } catch (ApiException $e) {
-            self::assertSame(403, $e->statusCode);
-            self::assertNull($e->detail);
-            self::assertStringNotContainsString('secret-signature', (string) $e);
-        }
+        $e = self::thrown(ApiException::class, fn() => $this->client([self::redirect(self::SIGNED), new Response(403, [], '<Error>AccessDenied secret-signature</Error>')])->proxies->download('latest'));
+        self::assertSame(403, $e->statusCode);
+        self::assertNull($e->detail);
+        self::assertStringNotContainsString('secret-signature', (string) $e);
 
         $this->history = [];
-        try {
-            $this->client([self::redirect(self::SIGNED), new ConnectException('Could not resolve ' . self::SIGNED, new Request('GET', self::SIGNED)), new Response(200)])->proxies->download('latest');
-            self::fail('expected a connection error');
-        } catch (ConnectionException $e) {
-            self::assertNull($e->getPrevious());
-            self::assertStringNotContainsString('secret-signature', (string) $e);
-        }
+        $e = self::thrown(ConnectionException::class, fn() => $this->client([self::redirect(self::SIGNED), self::dropped('Could not resolve ' . self::SIGNED), new Response(200)])->proxies->download('latest'));
+        self::assertNull($e->getPrevious());
+        self::assertStringNotContainsString('secret-signature', (string) $e);
         self::assertCount(2, $this->history);
     }
 }

@@ -70,11 +70,7 @@ final class LookupTest extends TestCase
     public function testLookupIpRejectsInvalidAddresses(string $ip): void
     {
         $client = $this->client([]);
-        try {
-            $client->lookupIp($ip);
-            self::fail('expected an invalid address error');
-        } catch (InvalidArgumentException) {
-        }
+        self::thrown(InvalidArgumentException::class, static fn() => $client->lookupIp($ip));
         self::assertSame([], $this->history);
     }
 
@@ -96,18 +92,10 @@ final class LookupTest extends TestCase
         $client = $this->client([]);
         self::assertSame([], $client->lookupIps([]));
 
-        try {
-            $client->lookupIps(array_fill(0, 1001, '8.8.8.8'));
-            self::fail('expected a batch limit error');
-        } catch (InvalidArgumentException $e) {
-            self::assertStringContainsString('1001', $e->getMessage());
-        }
-        try {
-            $client->lookupIps(['8.8.8.8', 'nope']);
-            self::fail('expected an invalid address error');
-        } catch (InvalidArgumentException $e) {
-            self::assertStringContainsString('index 1', $e->getMessage());
-        }
+        $e = self::thrown(InvalidArgumentException::class, static fn() => $client->lookupIps(array_fill(0, 1001, '8.8.8.8')));
+        self::assertStringContainsString('1001', $e->getMessage());
+        $e = self::thrown(InvalidArgumentException::class, static fn() => $client->lookupIps(['8.8.8.8', 'nope']));
+        self::assertStringContainsString('index 1', $e->getMessage());
         self::assertSame([], $this->history);
     }
 
@@ -166,17 +154,9 @@ final class LookupTest extends TestCase
     {
         $client = $this->client([]);
         foreach (['', '.', '..'] as $domain) {
-            try {
-                $client->lookupDomain($domain);
-                self::fail('expected an invalid domain error');
-            } catch (InvalidArgumentException) {
-            }
+            self::thrown(InvalidArgumentException::class, static fn() => $client->lookupDomain($domain));
         }
-        try {
-            $client->lookupDomain('example.com', limit: 0);
-            self::fail('expected an invalid limit error');
-        } catch (InvalidArgumentException) {
-        }
+        self::thrown(InvalidArgumentException::class, static fn() => $client->lookupDomain('example.com', limit: 0));
         self::assertSame([], $this->history);
     }
 }

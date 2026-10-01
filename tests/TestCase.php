@@ -5,13 +5,18 @@ declare(strict_types=1);
 namespace Synthient\Tests;
 
 use GuzzleHttp\Client as GuzzleClient;
+use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Middleware;
+use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
+use ReflectionProperty;
 use Synthient\Client;
+use Synthient\Feed;
+use Synthient\Internal\Transport;
 use Throwable;
 
 abstract class TestCase extends \PHPUnit\Framework\TestCase
@@ -26,19 +31,21 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
     protected array $sleeps = [];
 
     /**
-     * Builds a client whose requests are answered by $responses in order and recorded in
-     * $this->history. Retries record their delay in $this->sleeps instead of sleeping.
+     * Builds a client whose requests are answered by $handler, either a list of responses in
+     * order or a Guzzle handler, and recorded in $this->history. Retries record their delay
+     * in $this->sleeps instead of sleeping.
      *
-     * @param list<ResponseInterface|Throwable> $responses
+     * @param list<ResponseInterface|Throwable>|callable $handler
+     * @param array<string, mixed> $guzzle more Guzzle client config, such as default headers
      */
-    protected function client(array $responses, mixed ...$options): Client
+    protected function client(array|callable $handler, array $guzzle = [], mixed ...$options): Client
     {
-        $stack = HandlerStack::create(new MockHandler($responses));
+        $stack = HandlerStack::create(\is_array($handler) ? new MockHandler($handler) : $handler);
         $stack->push(Middleware::history($this->history));
         $client = new Client(...[
             'apiKey' => self::KEY,
             'baseUrl' => self::BASE_URL,
-            'httpClient' => new GuzzleClient(['handler' => $stack]),
+            'httpClient' => new GuzzleClient(['handler' => $stack, ...$guzzle]),
             ...$options,
         ]);
         $this->stubSleep($client);
@@ -48,13 +55,27 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
 
     protected function stubSleep(Client $client): void
     {
-        $sleeps = &$this->sleeps;
-        $transport = (fn(): object => $this->transport)->call($client);
-        (function () use (&$sleeps): void {
-            $this->sleep = static function (float $seconds) use (&$sleeps): void {
-                $sleeps[] = $seconds;
-            };
-        })->call($transport);
+        $transport = (new ReflectionProperty(Client::class, 'transport'))->getValue($client);
+        (new ReflectionProperty(Transport::class, 'sleep'))->setValue($transport, function (float $seconds): void {
+            $this->sleeps[] = $seconds;
+        });
+    }
+
+    /**
+     * @return array<string, Feed<covariant object>> each feed by its path under /feeds
+     */
+    protected static function feeds(Client $client): array
+    {
+        return [
+            'proxies' => $client->proxies,
+            'anonymizers' => $client->anonymizers,
+            'torrents' => $client->torrents,
+            'ja4t' => $client->ja4t,
+            'helio/http' => $client->heliosHttp,
+            'helio/https' => $client->heliosHttps,
+            'helio/dns' => $client->heliosDns,
+            'helio/adb' => $client->heliosAdb,
+        ];
     }
 
     /**
@@ -70,12 +91,40 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
      */
     protected static function problem(int $status, array $headers = []): Response
     {
-        return new Response($status, ['Content-Type' => 'application/problem+json', ...$headers], json_encode([
+        return self::json($status, [
             'type' => 'about:blank',
             'title' => 'Problem',
             'status' => $status,
             'detail' => 'something went wrong',
-        ], JSON_THROW_ON_ERROR));
+        ], ['Content-Type' => 'application/problem+json', ...$headers]);
+    }
+
+    protected static function dropped(string $message = 'cURL error 56: Connection reset by peer'): ConnectException
+    {
+        return new ConnectException($message, new Request('GET', 'https://api.test'));
+    }
+
+    /**
+     * Runs $fn and returns the $class exception it throws. Other exceptions propagate.
+     *
+     * @template E of Throwable
+     *
+     * @param class-string<E> $class
+     *
+     * @return E
+     */
+    protected static function thrown(string $class, callable $fn): Throwable
+    {
+        try {
+            $fn();
+        } catch (Throwable $e) {
+            if (!$e instanceof $class) {
+                throw $e;
+            }
+
+            return $e;
+        }
+        self::fail("expected {$class}");
     }
 
     /**
