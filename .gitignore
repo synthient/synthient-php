@@ -1,0 +1,8 @@
+.DS_Store
+*.parquet
+/vendor/
+/composer.lock
+/.phpunit.cache/
+/.php-cs-fixer.cache
+/consumer-test/vendor/
+/consumer-test/composer.lock
