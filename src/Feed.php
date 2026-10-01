@@ -137,21 +137,15 @@ final readonly class Feed
         if ($export === 'latest') {
             return $export;
         }
-        if (preg_match('#^(\d{4}-\d{2}-\d{2})(?:/(\d{1,2}))?$#', $export, $match) !== 1) {
+        if (
+            preg_match('#^(\d{4})-(\d{2})-(\d{2})(?:/(\d{1,2}))?$#', $export, $match) !== 1
+            || !checkdate((int) $match[2], (int) $match[3], (int) $match[1])
+            || (int) ($match[4] ?? 0) > 23
+        ) {
             throw new InvalidArgumentException('invalid export ID');
         }
-        $date = DateTimeImmutable::createFromFormat('!Y-m-d', $match[1]);
-        if ($date === false || $date->format('Y-m-d') !== $match[1]) {
-            throw new InvalidArgumentException('invalid export ID');
-        }
-        if (!isset($match[2])) {
-            return $match[1];
-        }
-        $hour = (int) $match[2];
-        if ($hour > 23) {
-            throw new InvalidArgumentException('invalid export ID');
-        }
+        $date = "{$match[1]}-{$match[2]}-{$match[3]}";
 
-        return "{$match[1]}/{$hour}";
+        return isset($match[4]) ? $date . '/' . (int) $match[4] : $date;
     }
 }
