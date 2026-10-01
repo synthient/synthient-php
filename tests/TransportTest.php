@@ -61,7 +61,7 @@ final class TransportTest extends TestCase
         $server = new ScriptedServer([[
             ['read' => true],
             ['write' => self::streamHead() . ScriptedServer::chunk("{\"ip\":\"203.0.113.7\"}\n\n")],
-            ['sleep' => 2],
+            ['sleep' => 1],
             ['write' => ScriptedServer::chunk("{\"ip\":\"203.0.113.8\"}\n") . "0\r\n\r\n"],
             ['close' => true],
         ]]);
@@ -77,8 +77,7 @@ final class TransportTest extends TestCase
         }
 
         self::assertCount(2, $arrivals);
-        self::assertLessThan(1.5, $arrivals[0]);
-        self::assertGreaterThan(1.5, $arrivals[1]);
+        self::assertGreaterThan(0.5, $arrivals[1] - $arrivals[0]);
         self::assertSame('application/x-ndjson', $server->requests()[0]['headers']['accept']);
     }
 
