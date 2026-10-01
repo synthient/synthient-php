@@ -151,9 +151,7 @@ final class Transport
                     'auth' => null,
                 ]);
             } catch (GuzzleException $e) {
-                throw preg_match('/timed out/i', $e->getMessage()) === 1
-                    ? new TimeoutException('synthient: export download timed out')
-                    : new ConnectionException('synthient: export download failed');
+                throw self::transportError($e, 'export download', null);
             }
             $status = $response->getStatusCode();
             if ($status === 200) {
@@ -250,9 +248,7 @@ final class Transport
                     continue;
                 }
 
-                throw preg_match('/timed out/i', $e->getMessage()) === 1
-                    ? new TimeoutException('synthient: request timed out', 0, $e)
-                    : new ConnectionException('synthient: request failed', 0, $e);
+                throw self::transportError($e, 'request', $e);
             }
             try {
                 if ($this->responseHook !== null) {
@@ -334,6 +330,13 @@ final class Transport
         }
 
         return $data;
+    }
+
+    private static function transportError(GuzzleException $e, string $action, ?\Throwable $previous): ConnectionException
+    {
+        return preg_match('/timed out/i', $e->getMessage()) === 1
+            ? new TimeoutException("synthient: {$action} timed out", 0, $previous)
+            : new ConnectionException("synthient: {$action} failed", 0, $previous);
     }
 
     private function apiError(ResponseInterface $response): ApiException
