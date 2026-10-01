@@ -234,7 +234,7 @@ final class Transport
             $payload = json_encode($body, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
         }
         $options = $this->options($stream);
-        if ($policy === RetryPolicy::RateLimit && \defined('CURLOPT_FRESH_CONNECT')) {
+        if ($policy === RetryPolicy::Billed && \defined('CURLOPT_FRESH_CONNECT')) {
             // libcurl silently resends a request whose reused connection dies before the
             // response starts, which could charge a lookup twice. A fresh connection is
             // never resent.
@@ -287,7 +287,7 @@ final class Transport
     private static function retryDelay(RetryPolicy $policy, ResponseInterface $response, int $attempt): ?float
     {
         $status = $response->getStatusCode();
-        if ($policy === RetryPolicy::RateLimit && $status !== 429) {
+        if ($policy !== RetryPolicy::Transient && $status !== 429) {
             return null;
         }
         if (!\in_array($status, [429, 500, 502, 503, 504], true)) {

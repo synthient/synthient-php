@@ -30,11 +30,11 @@ use Synthient\Model\IpInfo;
  * Create one client and reuse it. Constructing it makes no requests.
  *
  * Requests that cost no credits are retried on 429, 500, 502, 503, and 504 responses and on
- * transport failures. Billed lookups are retried only on 429, which the API returns before
- * doing any work, and are never resent on a reused connection. Retries back off
- * exponentially with jitter and honor Retry-After up to one minute. A 429 without
- * Retry-After is not retried, because it means the key's monthly request budget is spent or
- * too many of its streams are open.
+ * transport failures, except health(), which retries only 429. Billed lookups are retried
+ * only on 429, which the API returns before doing any work, and are never resent on a
+ * reused connection. Retries back off exponentially with jitter and honor Retry-After up to
+ * one minute. A 429 without Retry-After is not retried, because it means the key's monthly
+ * request budget is spent or too many of its streams are open.
  *
  * Errors throw ApiException for an error status, ConnectionException or TimeoutException for
  * a transport failure, and SynthientException for a malformed response. Invalid arguments
@@ -163,7 +163,7 @@ final class Client
     }
 
     /**
-     * Checks that the API is up. It costs no credits.
+     * Checks that the API is up. It costs no credits, and an unhealthy API is reported at once.
      *
      * @throws ApiException with status 503 when the API is unhealthy
      */
@@ -180,7 +180,7 @@ final class Client
     {
         $canonical = self::canonicalIp($ip) ?? throw new InvalidArgumentException('invalid IP address');
 
-        return $this->transport->request(IpInfo::class, 'GET', "/lookup/ip/{$canonical}", RetryPolicy::RateLimit);
+        return $this->transport->request(IpInfo::class, 'GET', "/lookup/ip/{$canonical}", RetryPolicy::Billed);
     }
 
     /**
@@ -209,7 +209,7 @@ final class Client
                 ?? throw new InvalidArgumentException("invalid IP address at index {$index}");
         }
 
-        $batch = $this->transport->request(IpBatch::class, 'POST', '/lookup/ips', RetryPolicy::RateLimit, body: ['ips' => $canonical]);
+        $batch = $this->transport->request(IpBatch::class, 'POST', '/lookup/ips', RetryPolicy::Billed, body: ['ips' => $canonical]);
 
         return $batch->results;
     }
@@ -232,7 +232,7 @@ final class Client
 
         $path = '/lookup/domain/' . rawurlencode($domain);
 
-        return $this->transport->request(DomainInfo::class, 'GET', $path, RetryPolicy::RateLimit, $limit === null ? [] : ['limit' => $limit]);
+        return $this->transport->request(DomainInfo::class, 'GET', $path, RetryPolicy::Billed, $limit === null ? [] : ['limit' => $limit]);
     }
 
     private static function canonicalIp(string $ip): ?string
