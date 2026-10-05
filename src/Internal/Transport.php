@@ -9,8 +9,11 @@ use DateTimeImmutable;
 use DateTimeZone;
 use GuzzleHttp\Client as GuzzleClient;
 use GuzzleHttp\ClientInterface;
+use GuzzleHttp\Exception\ConnectTimeoutException;
 use GuzzleHttp\Exception\GuzzleException;
 use GuzzleHttp\Exception\InvalidArgumentException as GuzzleInvalidArgumentException;
+use GuzzleHttp\Exception\NetworkTimeoutException;
+use GuzzleHttp\Exception\ResponseTimeoutException;
 use GuzzleHttp\Exception\TransferException;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Uri;
@@ -355,8 +358,12 @@ final class Transport
     private static function transportError(GuzzleException $e, string $action, bool $keepMessage): ConnectionException
     {
         $previous = $keepMessage ? new RuntimeException($e->getMessage()) : null;
+        $timedOut = $e instanceof ConnectTimeoutException
+            || $e instanceof NetworkTimeoutException
+            || $e instanceof ResponseTimeoutException
+            || preg_match('/cURL error 28:|timed out/i', $e->getMessage()) === 1;
 
-        return preg_match('/timed out/i', $e->getMessage()) === 1
+        return $timedOut
             ? new TimeoutException("synthient: {$action} timed out", 0, $previous)
             : new ConnectionException("synthient: {$action} failed", 0, $previous);
     }

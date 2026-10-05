@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Synthient\Tests;
 
 use GuzzleHttp\Exception\ConnectException;
+use GuzzleHttp\Exception\ConnectTimeoutException;
+use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Synthient\Exception\ApiException;
@@ -118,6 +120,38 @@ final class RetryTest extends TestCase
         self::thrown(TimeoutException::class, fn() => $this->client([self::dropped('cURL error 28: Operation timed out after 10001 milliseconds'), self::dropped('cURL error 28: Operation timed out')], maxRetries: 1)->account());
 
         self::assertCount(2, $this->history);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function timeoutMessages(): iterable
+    {
+        yield 'operation' => ['cURL error 28: Operation timed out after 10001 milliseconds with 0 bytes received'];
+        yield 'connect' => ['cURL error 28: Connection timeout after 10001 ms'];
+        yield 'tls handshake' => ['cURL error 28: SSL connection timeout'];
+        yield 'resolve' => ['cURL error 28: Resolving timed out after 10000 milliseconds'];
+        yield 'stream handler' => ['Connection timed out'];
+    }
+
+    #[DataProvider('timeoutMessages')]
+    public function testTimeoutsAreRecognized(string $message): void
+    {
+        $e = self::thrown(TimeoutException::class, fn() => $this->client([self::dropped($message)], maxRetries: 0)->account());
+
+        self::assertSame('synthient: request timed out', $e->getMessage());
+    }
+
+    public function testTypedGuzzleTimeoutsAreRecognized(): void
+    {
+        if (!class_exists(ConnectTimeoutException::class)) {
+            self::markTestSkipped('Guzzle 7 has no typed timeout exceptions');
+        }
+        $timeout = new ConnectTimeoutException('connect deadline exceeded', new Request('GET', self::BASE_URL));
+
+        $e = self::thrown(TimeoutException::class, fn() => $this->client([$timeout], maxRetries: 0)->account());
+
+        self::assertSame('synthient: request timed out', $e->getMessage());
     }
 
     public function testBackoff(): void
