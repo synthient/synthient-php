@@ -138,7 +138,7 @@ final class Client
         $this->transport = new Transport(
             $httpClient,
             $apiKey,
-            rtrim($baseUrl, '/'),
+            rtrim((string) $uri, '/'),
             $maxRetries,
             $connectTimeout,
             $timeout,

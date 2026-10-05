@@ -409,7 +409,8 @@ final class Transport
     {
         $location = trim($response->getHeaderLine('Location'));
         try {
-            $target = UriResolver::resolve(new Uri($from), new Uri($location));
+            $base = new Uri($from);
+            $target = UriResolver::resolve($base, new Uri($location));
         } catch (InvalidArgumentException) {
             throw new SynthientException('synthient: export redirect has no valid location');
         }
@@ -419,7 +420,7 @@ final class Transport
         if (!\in_array($target->getScheme(), ['http', 'https'], true)) {
             throw new SynthientException('synthient: export redirect has an unsupported scheme');
         }
-        if (str_starts_with($from, 'https:') && $target->getScheme() !== 'https') {
+        if ($base->getScheme() === 'https' && $target->getScheme() !== 'https') {
             throw new SynthientException('synthient: export redirect does not use https');
         }
 

@@ -91,6 +91,14 @@ final class DownloadTest extends TestCase
         }
     }
 
+    public function testUppercaseHttpsBaseNeverRedirectsToHttp(): void
+    {
+        $client = $this->client([self::redirect('http://storage.test/a?sig=secret-signature')], baseUrl: 'HTTPS://api.test/api/v4');
+
+        $e = self::thrown(SynthientException::class, static fn() => $client->proxies->downloadUrl('latest'));
+        self::assertStringContainsString('does not use https', $e->getMessage());
+    }
+
     public function testRedirectLimit(): void
     {
         $responses = [self::redirect(self::SIGNED)];

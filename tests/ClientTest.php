@@ -61,6 +61,25 @@ final class ClientTest extends TestCase
         new Client(...['apiKey' => self::KEY, ...$options]);
     }
 
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function equivalentBaseUrls(): iterable
+    {
+        yield 'uppercase scheme and host' => ['HTTPS://API.TEST/api/v4'];
+        yield 'empty query' => ['https://api.test/api/v4?'];
+        yield 'empty fragment' => ['https://api.test/api/v4#'];
+        yield 'default port' => ['https://api.test:443/api/v4'];
+    }
+
+    #[DataProvider('equivalentBaseUrls')]
+    public function testNormalizesTheBaseUrl(string $baseUrl): void
+    {
+        $this->client([self::json(200, ['status' => 'ok'])], baseUrl: $baseUrl)->health();
+
+        self::assertSame(self::BASE_URL . '/health', (string) $this->request()->getUri());
+    }
+
     public function testKeepsTheApiKeyOutOfStackTraces(): void
     {
         $ignoreArgs = (string) \ini_get('zend.exception_ignore_args');
