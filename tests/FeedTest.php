@@ -78,7 +78,7 @@ final class FeedTest extends TestCase
 
     public function testListExports(): void
     {
-        $page = $this->client([self::json(200, Fixtures::exportPage([Fixtures::export('2026-05-03/7', 7), Fixtures::export()], 'c2'))])
+        $page = $this->client([self::json(200, Fixtures::exportPage([Fixtures::export('2026-05-03/7'), Fixtures::export()], 'c2'))])
             ->proxies->listExports(limit: 2, cursor: 'c1');
 
         self::assertSame(self::BASE_URL . '/feeds/proxies/export?cursor=c1&limit=2', (string) $this->request()->getUri());
@@ -154,14 +154,17 @@ final class FeedTest extends TestCase
         self::assertSame(403, $error->statusCode);
     }
 
-    public function testEmptyAndAbsentCursorsEndTheListing(): void
+    public function testAbsentEmptyAndNullCursorsEndTheListing(): void
     {
-        $body = Fixtures::exportPage([Fixtures::export('a')]);
-        unset($body['next_cursor']);
-        $client = $this->client([self::json(200, $body), self::json(200, Fixtures::exportPage([Fixtures::export('b')], ''))]);
+        $client = $this->client([
+            self::json(200, Fixtures::exportPage([Fixtures::export('a')])),
+            self::json(200, Fixtures::exportPage([Fixtures::export('b')], '')),
+            self::json(200, ['next_cursor' => null] + Fixtures::exportPage([Fixtures::export('c')])),
+        ]);
 
-        self::assertCount(1, iterator_to_array($client->proxies->allExports()));
-        self::assertCount(1, iterator_to_array($client->proxies->allExports()));
-        self::assertCount(2, $this->history);
+        for ($i = 0; $i < 3; $i++) {
+            self::assertCount(1, iterator_to_array($client->proxies->allExports()));
+        }
+        self::assertCount(3, $this->history);
     }
 }

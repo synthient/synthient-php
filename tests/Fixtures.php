@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Synthient\Tests;
 
+use DateTimeImmutable;
+
 /**
- * Response bodies shaped like the API's. ipInfo() carries unknown fields to prove additive
- * fields are ignored.
+ * Response bodies shaped like the API's, which omits optional fields rather than sending
+ * null. ipInfo() carries unknown fields to prove additive fields are ignored.
  */
 final class Fixtures
 {
@@ -20,7 +22,6 @@ final class Fixtures
             'network' => [
                 'asn' => 15169,
                 'isp' => 'Google LLC',
-                'org' => null,
                 'type' => 'DATACENTER',
                 'future_field' => true,
             ],
@@ -96,19 +97,25 @@ final class Fixtures
     /**
      * @return array<string, mixed>
      */
-    public static function export(string $id = '2026-05-03', ?int $hour = null): array
+    public static function export(string $id = '2026-05-03'): array
     {
-        return [
+        $date = preg_match('/^\d{4}-\d{2}-\d{2}/', $id, $match) === 1 ? $match[0] : '2026-05-03';
+        $hour = str_contains($id, '/') ? (int) explode('/', $id)[1] : null;
+        $export = [
             'id' => $id,
             'kind' => $hour === null ? 'daily' : 'hourly',
-            'date' => '2026-05-03',
-            'hour' => $hour,
+            'date' => $date,
             'size_bytes' => 1024,
             'row_count' => 10,
             'checksum' => str_repeat('ab', 32),
-            'created_at' => 1_777_852_800,
+            'created_at' => (new DateTimeImmutable("{$date}T00:00:00Z"))->getTimestamp() + ($hour === null ? 86400 : ($hour + 1) * 3600),
             'download_path' => "/api/v4/feeds/proxies/export/{$id}",
         ];
+        if ($hour !== null) {
+            $export['hour'] = $hour;
+        }
+
+        return $export;
     }
 
     /**
@@ -118,7 +125,12 @@ final class Fixtures
      */
     public static function exportPage(array $exports, ?string $nextCursor = null): array
     {
-        return ['stream' => 'proxies', 'feeds' => $exports, 'next_cursor' => $nextCursor];
+        $page = ['stream' => 'proxies', 'feeds' => $exports];
+        if ($nextCursor !== null) {
+            $page['next_cursor'] = $nextCursor;
+        }
+
+        return $page;
     }
 
     /**
