@@ -65,7 +65,7 @@ final class Transport
         $this->http = $http ?? new GuzzleClient();
         $this->defaultHttp = $http === null;
         $this->sleep = static function (float $seconds): void {
-            usleep((int) ($seconds * 1_000_000));
+            time_nanosleep((int) $seconds, (int) (fmod($seconds, 1) * 1e9));
         };
     }
 
