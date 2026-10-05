@@ -157,6 +157,7 @@ final class LookupTest extends TestCase
             self::thrown(InvalidArgumentException::class, static fn() => $client->lookupDomain($domain));
         }
         self::thrown(InvalidArgumentException::class, static fn() => $client->lookupDomain('example.com', limit: 0));
+        self::thrown(InvalidArgumentException::class, static fn() => $client->lookupDomain('example.com', limit: 1001));
         self::assertSame([], $this->history);
     }
 }

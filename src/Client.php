@@ -226,8 +226,8 @@ final class Client
         if ($domain === '' || $domain === '.' || $domain === '..') {
             throw new InvalidArgumentException('invalid domain');
         }
-        if ($limit !== null && $limit < 1) {
-            throw new InvalidArgumentException('limit must be positive');
+        if ($limit !== null && ($limit < 1 || $limit > 1000)) {
+            throw new InvalidArgumentException('limit must be from 1 to 1,000');
         }
 
         $path = '/lookup/domain/' . rawurlencode($domain);

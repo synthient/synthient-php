@@ -63,9 +63,7 @@ final readonly class Feed
      */
     public function listExports(?int $limit = null, ?string $cursor = null): ExportPage
     {
-        if ($limit !== null && $limit < 1) {
-            throw new InvalidArgumentException('limit must be positive');
-        }
+        self::checkLimit($limit);
         $query = [];
         if ($cursor !== null && $cursor !== '') {
             $query['cursor'] = $cursor;
@@ -84,6 +82,16 @@ final readonly class Feed
      * @return Generator<int, Export>
      */
     public function allExports(?int $limit = null, ?string $cursor = null): Generator
+    {
+        self::checkLimit($limit);
+
+        return $this->pages($limit, $cursor);
+    }
+
+    /**
+     * @return Generator<int, Export>
+     */
+    private function pages(?int $limit, ?string $cursor): Generator
     {
         $seen = $cursor === null ? [] : [$cursor => true];
         while (true) {
@@ -125,6 +133,13 @@ final readonly class Feed
     public function download(string|DateTimeInterface $export): StreamInterface
     {
         return $this->transport->openDownload($this->downloadUrl($export));
+    }
+
+    private static function checkLimit(?int $limit): void
+    {
+        if ($limit !== null && ($limit < 1 || $limit > 500)) {
+            throw new InvalidArgumentException('limit must be from 1 to 500');
+        }
     }
 
     private static function exportId(string|DateTimeInterface $export): string

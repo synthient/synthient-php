@@ -90,10 +90,14 @@ final class FeedTest extends TestCase
         self::assertSame(1_777_852_800, $page->exports[1]->createdAt->getTimestamp());
     }
 
-    public function testListExportsRejectsInvalidLimits(): void
+    public function testExportListingsRejectInvalidLimits(): void
     {
-        $this->expectException(InvalidArgumentException::class);
-        $this->client([])->proxies->listExports(limit: 0);
+        $feed = $this->client([])->proxies;
+        foreach ([0, 501] as $limit) {
+            self::thrown(InvalidArgumentException::class, static fn() => $feed->listExports(limit: $limit));
+            self::thrown(InvalidArgumentException::class, static fn() => $feed->allExports(limit: $limit));
+        }
+        self::assertSame([], $this->history);
     }
 
     public function testAllExportsFollowsCursorsThroughEmptyPages(): void
