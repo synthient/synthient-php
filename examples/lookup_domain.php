@@ -10,9 +10,12 @@ declare(strict_types=1);
 
 require __DIR__ . '/../vendor/autoload.php';
 
-$domain = $argv[1] ?? exit("usage: php examples/lookup_domain.php <domain>\n");
+if (!isset($argv[1])) {
+    fwrite(STDERR, "usage: php examples/lookup_domain.php <domain>\n");
+    exit(1);
+}
 $client = new Synthient\Client();
-$info = $client->lookupDomain($domain, limit: 5);
+$info = $client->lookupDomain($argv[1], limit: 5);
 
 echo "{$info->domain}: {$info->status}\n";
 echo "events: {$info->stats->events24h} in 24 hours, {$info->stats->totalEvents30d} in 30 days\n";

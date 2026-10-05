@@ -28,7 +28,8 @@ while (true) {
         }
     } catch (SynthientException $e) {
         if ($e instanceof ApiException && in_array($e->statusCode, [401, 403], true)) {
-            exit("{$e->getMessage()}: check the key and its PROXY_FIREHOSE scope\n");
+            fwrite(STDERR, "{$e->getMessage()}: check the key and its PROXY_FIREHOSE scope\n");
+            exit(1);
         }
         fwrite(STDERR, "{$e->getMessage()}, reconnecting\n");
     }

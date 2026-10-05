@@ -10,7 +10,11 @@ declare(strict_types=1);
 
 require __DIR__ . '/../vendor/autoload.php';
 
-$ips = array_slice($argv ?? [], 1) ?: exit("usage: php examples/lookup_ips.php <ip>...\n");
+$ips = array_slice($argv ?? [], 1);
+if ($ips === []) {
+    fwrite(STDERR, "usage: php examples/lookup_ips.php <ip>...\n");
+    exit(1);
+}
 $client = new Synthient\Client();
 
 foreach ($client->lookupIps($ips) as $result) {

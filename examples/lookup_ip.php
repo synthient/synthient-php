@@ -12,14 +12,18 @@ use Synthient\Exception\ApiException;
 
 require __DIR__ . '/../vendor/autoload.php';
 
-$ip = $argv[1] ?? exit("usage: php examples/lookup_ip.php <ip>\n");
+if (!isset($argv[1])) {
+    fwrite(STDERR, "usage: php examples/lookup_ip.php <ip>\n");
+    exit(1);
+}
 $client = new Synthient\Client();
 
 try {
-    $info = $client->lookupIp($ip);
+    $info = $client->lookupIp($argv[1]);
 } catch (ApiException $e) {
     if ($e->statusCode === 402) {
-        exit("out of lookup credits\n");
+        fwrite(STDERR, "out of lookup credits\n");
+        exit(1);
     }
 
     throw $e;
