@@ -253,7 +253,7 @@ final class ConformanceTest extends TestCase
 
         return match ($definition['type'] ?? null) {
             'string' => ($definition['format'] ?? null) === 'date-time' ? [DateTimeImmutable::class] : ['string'],
-            'integer' => ['int'],
+            'integer' => ($definition['minimum'] ?? null) === 0 ? ['int', 'uint64'] : ['int'],
             'number' => ['float'],
             'boolean' => ['bool'],
             'array' => array_map(static fn(string $item) => "list<{$item}>", self::phpTypes(\is_array($definition['items'] ?? null) ? $definition['items'] : [])),

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Synthient\Tests;
 
 use PHPUnit\Framework\Attributes\DataProvider;
+use Synthient\Event\HeliosDnsEvent;
 use Synthient\Exception\SynthientException;
 use Synthient\Internal\Decoder;
 use Synthient\Model\Account;
@@ -113,6 +114,32 @@ final class DecoderTest extends TestCase
     {
         $this->expectException(SynthientException::class);
         Decoder::decode(IpInfo::class, $json);
+    }
+
+    public function testReadsUint64AsAString(): void
+    {
+        $event = static fn(string $id): string => '{"timestamp":1760000000,"tunnel_id":' . $id . ',"domain":"example.com","port":53,"protocol":"dns","meta":{}}';
+
+        self::assertSame('18446744073709551615', Decoder::decode(HeliosDnsEvent::class, $event('18446744073709551615'))->tunnelId);
+        self::assertSame('0', Decoder::decode(HeliosDnsEvent::class, $event('0'))->tunnelId);
+        foreach (['-1', '-9223372036854775809', '1.5', '"x"', 'true'] as $id) {
+            $e = self::thrown(SynthientException::class, static fn() => Decoder::decode(HeliosDnsEvent::class, $event($id)));
+            self::assertStringContainsString('tunnel_id must be an unsigned integer', $e->getMessage(), $id);
+        }
+    }
+
+    public function testIgnoresUnknownFieldsAtEveryLevel(): void
+    {
+        $body = Fixtures::ipInfo();
+        $body['location']['future'] = 1;
+        $body['intelligence']['future'] = [1];
+        $body['intelligence']['providers'][0]['future'] = ['a' => 'b'];
+        $body['intelligence']['devices'][0]['future'] = null;
+
+        self::assertEquals(
+            Decoder::decode(IpInfo::class, json_encode(Fixtures::ipInfo(), JSON_THROW_ON_ERROR)),
+            Decoder::decode(IpInfo::class, json_encode($body, JSON_THROW_ON_ERROR)),
+        );
     }
 
     public function testRejectsInvalidDateTimes(): void

@@ -116,6 +116,18 @@ final class StreamTest extends TestCase
         self::assertCount(1, $events);
     }
 
+    public function testHeliosEventsKeepLargeTunnelIdsAndAnyHeaderName(): void
+    {
+        $events = iterator_to_array($this->client([self::ndjson(
+            '{"timestamp":1760000000,"tunnel_id":17257744507466107949,"domain":"example.com","port":80,"protocol":"http","meta":{},"details":{"headers":{"\\u0000x":"1","123":"2","Host":"example.com"}}}' . "\n"
+            . '{"timestamp":1760000000,"tunnel_id":1942782,"domain":"example.com","port":80,"protocol":"http","meta":{}}' . "\n",
+        )])->heliosHttp->stream());
+
+        self::assertSame('17257744507466107949', $events[0]->tunnelId);
+        self::assertSame(["\0x" => '1', 123 => '2', 'Host' => 'example.com'], $events[0]->details?->headers);
+        self::assertSame('1942782', $events[1]->tunnelId);
+    }
+
     public function testClosingDuringIterationEndsItWithoutAnError(): void
     {
         $events = $this->client([self::ndjson("{\"ip\":\"203.0.113.7\"}\n{\"ip\":\"203.0.113.8\"}\n{\"ip\":")])->proxies->stream();

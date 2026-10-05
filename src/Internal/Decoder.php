@@ -9,7 +9,6 @@ use DateTimeZone;
 use JsonException;
 use ReflectionClass;
 use ReflectionNamedType;
-use stdClass;
 use Synthient\Exception\SynthientException;
 
 /**
@@ -21,6 +20,10 @@ use Synthient\Exception\SynthientException;
  * milliseconds and smaller ones as seconds; string timestamps must be RFC 3339. Errors name
  * the field path and never include values.
  *
+ * JSON is decoded into arrays rather than objects, because PHP objects cannot hold every
+ * valid key, such as one starting with a NUL byte. An empty object and an empty list are
+ * then indistinguishable, so each is accepted where the other is expected.
+ *
  * @internal
  */
 final class Decoder
@@ -29,6 +32,8 @@ final class Decoder
 
     /** @var array<class-string, list<array{param: string, key: string, type: string, nullable: bool}>> */
     private static array $fields = [];
+
+    private static ?DateTimeZone $utc = null;
 
     /**
      * @template T of object
@@ -40,7 +45,7 @@ final class Decoder
     public static function decode(string $class, string $json): object
     {
         try {
-            $data = json_decode($json, false, 512, JSON_THROW_ON_ERROR | JSON_BIGINT_AS_STRING);
+            $data = json_decode($json, true, 512, JSON_THROW_ON_ERROR | JSON_BIGINT_AS_STRING);
         } catch (JsonException $e) {
             throw new SynthientException('synthient: response is not valid JSON', 0, $e);
         }
@@ -66,13 +71,13 @@ final class Decoder
      */
     private static function object(string $class, mixed $data, string $path): object
     {
-        if (!$data instanceof stdClass) {
+        if (!\is_array($data) || ($data !== [] && array_is_list($data))) {
             throw self::invalid($path === '' ? 'response' : $path, 'an object');
         }
         $args = [];
         foreach (self::$fields[$class] ??= self::fields($class) as $field) {
             $at = $path === '' ? $field['key'] : "{$path}.{$field['key']}";
-            $value = $data->{$field['key']} ?? null;
+            $value = $data[$field['key']] ?? null;
             if ($value === null && !$field['nullable']) {
                 throw new SynthientException("synthient: invalid response: {$at} is missing");
             }
@@ -83,6 +88,19 @@ final class Decoder
     }
 
     private static function value(string $type, mixed $value, string $path): mixed
+    {
+        return match ($type) {
+            'string' => \is_string($value) ? $value : throw self::invalid($path, 'a string'),
+            'int' => \is_int($value) ? $value : throw self::invalid($path, 'an integer'),
+            'uint64' => self::uint64($value, $path),
+            'float' => \is_int($value) || \is_float($value) ? (float) $value : throw self::invalid($path, 'a number'),
+            'bool' => \is_bool($value) ? $value : throw self::invalid($path, 'a boolean'),
+            DateTimeImmutable::class => self::time($value, $path),
+            default => self::compound($type, $value, $path),
+        };
+    }
+
+    private static function compound(string $type, mixed $value, string $path): mixed
     {
         if (str_starts_with($type, 'list<')) {
             if (!\is_array($value) || !array_is_list($value)) {
@@ -97,28 +115,37 @@ final class Decoder
             return $items;
         }
         if (str_starts_with($type, 'map<')) {
-            if (!$value instanceof stdClass) {
+            if (!\is_array($value)) {
                 throw self::invalid($path, 'an object');
             }
             $element = substr($type, 4, -1);
             $items = [];
-            foreach (get_object_vars($value) as $key => $item) {
+            foreach ($value as $key => $item) {
                 $items[$key] = self::value($element, $item, "{$path}.{$key}");
             }
 
             return $items;
         }
+        if (!class_exists($type)) {
+            throw new \LogicException("cannot decode JSON into {$type}");
+        }
 
-        return match ($type) {
-            'string' => \is_string($value) ? $value : throw self::invalid($path, 'a string'),
-            'int' => \is_int($value) ? $value : throw self::invalid($path, 'an integer'),
-            'float' => \is_int($value) || \is_float($value) ? (float) $value : throw self::invalid($path, 'a number'),
-            'bool' => \is_bool($value) ? $value : throw self::invalid($path, 'a boolean'),
-            DateTimeImmutable::class => self::time($value, $path),
-            default => class_exists($type)
-                ? self::object($type, $value, $path)
-                : throw new \LogicException("cannot decode JSON into {$type}"),
-        };
+        return self::object($type, $value, $path);
+    }
+
+    /**
+     * Reads an unsigned 64-bit integer as a decimal string, because it can exceed PHP_INT_MAX.
+     */
+    private static function uint64(mixed $value, string $path): string
+    {
+        if (\is_int($value) && $value >= 0) {
+            return (string) $value;
+        }
+        if (\is_string($value) && preg_match('/^\d{1,20}$/', $value) === 1) {
+            return $value;
+        }
+
+        throw self::invalid($path, 'an unsigned integer');
     }
 
     private static function time(mixed $value, string $path): DateTimeImmutable
@@ -134,7 +161,7 @@ final class Decoder
             throw self::invalid($path, 'a Unix timestamp or an RFC 3339 date-time');
         }
 
-        return $time->setTimezone(new DateTimeZone('UTC'));
+        return $time->setTimezone(self::$utc ??= new DateTimeZone('UTC'));
     }
 
     /**
@@ -156,6 +183,7 @@ final class Decoder
                 'param' => $param->getName(),
                 'key' => $wire->name ?? strtolower((string) preg_replace('/[A-Z]/', '_$0', $param->getName())),
                 'type' => match (true) {
+                    $wire?->type !== null => $wire->type,
                     $wire?->list !== null => "list<{$wire->list}>",
                     $wire?->map !== null => "map<{$wire->map}>",
                     default => $type->getName(),

@@ -12,7 +12,8 @@ use Synthient\Internal\Wire;
 final readonly class HttpRequestDetails
 {
     /**
-     * @param array<string, string>|null $headers
+     * @param array<array-key, string>|null $headers by name; PHP stores a numeric name such as
+     *                                             "123" as an int key
      */
     public function __construct(
         public ?string $method = null,
