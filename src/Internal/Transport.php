@@ -137,13 +137,14 @@ final class Transport
     }
 
     /**
-     * Downloads from storage without the API key or the client's default headers, cookies,
-     * and auth, following up to ten validated redirects. Nothing is retried, and
-     * errors never include the presigned URL.
+     * Asks the API where an export is stored, then downloads it from storage without the API
+     * key or the client's default headers, cookies, and auth, following up to ten validated
+     * redirects. Nothing is retried, and errors never include the presigned URL.
      */
-    public function openDownload(string $url): StreamInterface
+    public function openDownload(string $path): StreamInterface
     {
         $this->requireStreaming();
+        $url = $this->downloadUrl($path);
         for ($hop = 0; ; $hop++) {
             try {
                 $response = $this->http->send(new Request('GET', $url, ['User-Agent' => $this->userAgent]), [

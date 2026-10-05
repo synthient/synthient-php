@@ -132,7 +132,7 @@ final readonly class Feed
      */
     public function download(string|DateTimeInterface $export): StreamInterface
     {
-        return $this->transport->openDownload($this->downloadUrl($export));
+        return $this->transport->openDownload("{$this->path}/export/" . self::exportId($export));
     }
 
     private static function checkLimit(?int $limit): void
