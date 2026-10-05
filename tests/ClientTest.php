@@ -83,15 +83,18 @@ final class ClientTest extends TestCase
     public function testKeepsTheApiKeyOutOfStackTraces(): void
     {
         $ignoreArgs = (string) \ini_get('zend.exception_ignore_args');
+        $maxLength = (string) \ini_get('zend.exception_string_param_max_len');
         ini_set('zend.exception_ignore_args', '0');
+        ini_set('zend.exception_string_param_max_len', '15');
         try {
-            $e = self::thrown(InvalidArgumentException::class, static fn() => new Client(apiKey: 'secret-key', baseUrl: 'ftp://x'));
+            $trace = self::thrown(InvalidArgumentException::class, static fn() => new Client(apiKey: 'secret-key', baseUrl: 'ftp://x'))->getTraceAsString();
         } finally {
             ini_set('zend.exception_ignore_args', $ignoreArgs);
+            ini_set('zend.exception_string_param_max_len', $maxLength);
         }
 
-        self::assertStringContainsString('ftp://x', $e->getTraceAsString());
-        self::assertStringNotContainsString('secret-key', $e->getTraceAsString());
+        self::assertStringContainsString('ftp://x', $trace);
+        self::assertStringNotContainsString('secret-key', $trace);
     }
 
     public function testSendsAuthenticationAndIdentification(): void
