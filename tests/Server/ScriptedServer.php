@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Synthient\Tests\Server;
 
 use RuntimeException;
+use Throwable;
 
 /**
  * Runs server.php in a child process for tests that need real connections.
@@ -13,7 +14,7 @@ final class ScriptedServer
 {
     public readonly int $port;
 
-    /** @var resource */
+    /** @var resource|null */
     private $process;
 
     private readonly string $log;
@@ -25,25 +26,31 @@ final class ScriptedServer
     {
         $script = (string) tempnam(sys_get_temp_dir(), 'synthient-script');
         $this->log = (string) tempnam(sys_get_temp_dir(), 'synthient-log');
-        file_put_contents($script, json_encode($connections, JSON_THROW_ON_ERROR));
-        $process = proc_open([PHP_BINARY, __DIR__ . '/server.php', $script, $this->log], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
-        if ($process === false) {
-            throw new RuntimeException('could not start the test server');
+        try {
+            file_put_contents($script, json_encode($connections, JSON_THROW_ON_ERROR));
+            $process = proc_open([PHP_BINARY, __DIR__ . '/server.php', $script, $this->log], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+            if ($process === false) {
+                throw new RuntimeException('could not start the test server');
+            }
+            $this->process = $process;
+            $port = fgets($pipes[1]);
+            if ($port === false) {
+                throw new RuntimeException('the test server did not start: ' . stream_get_contents($pipes[2]));
+            }
+            $this->port = (int) $port;
+        } catch (Throwable $e) {
+            $this->stop();
+
+            throw $e;
+        } finally {
+            // The server reads its script before it prints the port.
+            @unlink($script);
         }
-        $this->process = $process;
-        $port = fgets($pipes[1]);
-        if ($port === false) {
-            throw new RuntimeException('the test server did not start: ' . stream_get_contents($pipes[2]));
-        }
-        $this->port = (int) $port;
     }
 
     public function __destruct()
     {
-        $status = proc_get_status($this->process);
-        posix_kill(-$status['pid'], SIGKILL);
-        proc_close($this->process);
-        @unlink($this->log);
+        $this->stop();
     }
 
     public function url(string $path = ''): string
@@ -90,5 +97,15 @@ final class ScriptedServer
     public static function chunk(string $data): string
     {
         return dechex(\strlen($data)) . "\r\n{$data}\r\n";
+    }
+
+    private function stop(): void
+    {
+        if ($this->process !== null) {
+            posix_kill(-proc_get_status($this->process)['pid'], SIGKILL);
+            proc_close($this->process);
+            $this->process = null;
+        }
+        @unlink($this->log);
     }
 }
