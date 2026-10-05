@@ -10,6 +10,7 @@ use DateTimeZone;
 use GuzzleHttp\Client as GuzzleClient;
 use GuzzleHttp\ClientInterface;
 use GuzzleHttp\Exception\GuzzleException;
+use GuzzleHttp\Exception\InvalidArgumentException as GuzzleInvalidArgumentException;
 use GuzzleHttp\Exception\TransferException;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Uri;
@@ -238,7 +239,8 @@ final class Transport
         if ($policy === RetryPolicy::Billed && \defined('CURLOPT_FRESH_CONNECT')) {
             // libcurl silently resends a request whose reused connection dies before the
             // response starts, which could charge a lookup twice. A fresh connection is
-            // never resent.
+            // never resent. Handlers that take no cURL options, such as Guzzle 8's stream
+            // handler, reject it before sending anything, and the request goes without it.
             $options['curl'] = [CURLOPT_FRESH_CONNECT => true];
         }
 
@@ -247,6 +249,12 @@ final class Transport
             try {
                 $response = $this->http->send(new Request($method, $url, $headers, $payload), $options);
             } catch (GuzzleException $e) {
+                if ($e instanceof GuzzleInvalidArgumentException && isset($options['curl'])) {
+                    unset($options['curl']);
+                    $attempt--;
+
+                    continue;
+                }
                 $transient = $e instanceof TransferException && preg_match(self::TLS_FAILURE, $e->getMessage()) !== 1;
                 if ($canRetry && $policy === RetryPolicy::Transient && $transient) {
                     ($this->sleep)(self::backoff($attempt));

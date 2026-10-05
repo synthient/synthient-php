@@ -5,8 +5,12 @@ declare(strict_types=1);
 namespace Synthient\Tests;
 
 use DateTimeImmutable;
+use GuzzleHttp\Exception\InvalidArgumentException as GuzzleInvalidArgumentException;
+use GuzzleHttp\Handler\MockHandler;
+use GuzzleHttp\Promise\PromiseInterface;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Psr\Http\Message\RequestInterface;
 use Synthient\Enum\Cadence;
 use Synthient\Enum\DomainStatus;
 use Synthient\Enum\NetworkType;
@@ -116,6 +120,25 @@ final class LookupTest extends TestCase
             self::assertSame([CURLOPT_FRESH_CONNECT => true], $this->history[$index]['options']['curl'] ?? null);
         }
         self::assertArrayNotHasKey('curl', $this->history[3]['options']);
+    }
+
+    public function testBilledLookupsDropTheCurlOptionWhenTheHandlerRejectsIt(): void
+    {
+        $mock = new MockHandler([self::json(200, Fixtures::ipInfo())]);
+        $calls = 0;
+        $handler = static function (RequestInterface $request, array $options) use ($mock, &$calls): PromiseInterface {
+            $calls++;
+            if (isset($options['curl'])) {
+                throw new GuzzleInvalidArgumentException('Passing the "curl" request option to the stream handler is not supported');
+            }
+
+            return $mock($request, $options);
+        };
+
+        self::assertSame('8.8.8.8', $this->client($handler)->lookupIp('8.8.8.8')->ip);
+        self::assertSame(2, $calls);
+        self::assertCount(1, $this->history);
+        self::assertArrayNotHasKey('curl', $this->history[0]['options']);
     }
 
     public function testLookupDomain(): void

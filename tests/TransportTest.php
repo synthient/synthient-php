@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Synthient\Tests;
 
+use GuzzleHttp\Client as GuzzleClient;
+use GuzzleHttp\Handler\StreamHandler;
+use GuzzleHttp\HandlerStack;
 use PHPUnit\Framework\Attributes\RequiresFunction;
 use Synthient\Client;
 use Synthient\Exception\ConnectionException;
@@ -54,6 +57,15 @@ final class TransportTest extends TestCase
         $requests = $server->requests();
         self::assertSame(['GET /api/v4/account/me HTTP/1.1', 'GET /api/v4/lookup/ip/8.8.8.8 HTTP/1.1'], array_column($requests, 'line'));
         self::assertSame([0, 1], array_column($requests, 'connection'));
+    }
+
+    public function testBilledLookupWorksWithTheStreamHandler(): void
+    {
+        $server = new ScriptedServer([[['read' => true], ['write' => ScriptedServer::json(200, Fixtures::ipInfo())], ['close' => true]]]);
+        $http = new GuzzleClient(['handler' => HandlerStack::create(new StreamHandler())]);
+
+        self::assertSame('8.8.8.8', $this->realClient($server, httpClient: $http)->lookupIp('8.8.8.8')->ip);
+        self::assertCount(1, $server->requests());
     }
 
     public function testStreamDeliversEventsBeforeTheResponseEnds(): void
