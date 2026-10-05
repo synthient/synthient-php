@@ -28,6 +28,7 @@ final class EventStream implements IteratorAggregate
     public const int MAX_EVENT_SIZE = 16 << 20;
 
     private bool $iterated = false;
+    private bool $closed = false;
 
     /**
      * @internal
@@ -53,7 +54,7 @@ final class EventStream implements IteratorAggregate
 
         try {
             $buffer = '';
-            while (!$this->body->eof()) {
+            while (!$this->closed && !$this->body->eof()) {
                 $chunk = $this->body->read(65536);
                 $buffer .= $chunk;
                 if (str_contains($chunk, "\n")) {
@@ -71,7 +72,7 @@ final class EventStream implements IteratorAggregate
                 }
             }
             $line = trim($buffer);
-            if ($line !== '') {
+            if ($line !== '' && !$this->closed) {
                 yield Decoder::decode($this->event, $line);
             }
         } finally {
@@ -79,8 +80,13 @@ final class EventStream implements IteratorAggregate
         }
     }
 
+    /**
+     * Closes the connection. An iteration in progress then ends without an error, after the
+     * events already received.
+     */
     public function close(): void
     {
+        $this->closed = true;
         $this->body->close();
     }
 }

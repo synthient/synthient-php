@@ -116,6 +116,18 @@ final class StreamTest extends TestCase
         self::assertCount(1, $events);
     }
 
+    public function testClosingDuringIterationEndsItWithoutAnError(): void
+    {
+        $events = $this->client([self::ndjson("{\"ip\":\"203.0.113.7\"}\n{\"ip\":\"203.0.113.8\"}\n{\"ip\":")])->proxies->stream();
+        $seen = [];
+        foreach ($events as $event) {
+            $seen[] = $event->ip;
+            $events->close();
+        }
+
+        self::assertSame(['203.0.113.7', '203.0.113.8'], $seen);
+    }
+
     public function testInvalidEventEndsTheStream(): void
     {
         [$events, $error] = self::drain($this->client([self::ndjson("{\"ip\":\"203.0.113.7\"}\n{\"ip\":7}\n{\"ip\":\"203.0.113.8\"}\n")])->proxies->stream());
