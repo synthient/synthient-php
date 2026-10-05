@@ -61,6 +61,20 @@ final class ClientTest extends TestCase
         new Client(...['apiKey' => self::KEY, ...$options]);
     }
 
+    public function testKeepsTheApiKeyOutOfStackTraces(): void
+    {
+        $ignoreArgs = (string) \ini_get('zend.exception_ignore_args');
+        ini_set('zend.exception_ignore_args', '0');
+        try {
+            $e = self::thrown(InvalidArgumentException::class, static fn() => new Client(apiKey: 'secret-key', baseUrl: 'ftp://x'));
+        } finally {
+            ini_set('zend.exception_ignore_args', $ignoreArgs);
+        }
+
+        self::assertStringContainsString('ftp://x', $e->getTraceAsString());
+        self::assertStringNotContainsString('secret-key', $e->getTraceAsString());
+    }
+
     public function testSendsAuthenticationAndIdentification(): void
     {
         $client = $this->client([self::json(200, Fixtures::account())], userAgent: 'my-app/1.2', baseUrl: self::BASE_URL . '/');

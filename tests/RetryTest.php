@@ -101,7 +101,8 @@ final class RetryTest extends TestCase
     {
         $e = self::thrown(ConnectionException::class, fn() => $this->client([self::dropped(), self::json(200, Fixtures::ipInfo())])->lookupIp('8.8.8.8'));
 
-        self::assertInstanceOf(ConnectException::class, $e->getPrevious());
+        self::assertNotInstanceOf(ConnectException::class, $e->getPrevious());
+        self::assertSame('cURL error 56: Connection reset by peer', $e->getPrevious()?->getMessage());
         self::assertCount(1, $this->history);
     }
 

@@ -19,6 +19,7 @@ use InvalidArgumentException;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\StreamInterface;
 use Random\Randomizer;
+use RuntimeException;
 use Synthient\Exception\ApiException;
 use Synthient\Exception\ConnectionException;
 use Synthient\Exception\SynthientException;
@@ -52,6 +53,7 @@ final class Transport
      */
     public function __construct(
         ?ClientInterface $http,
+        #[\SensitiveParameter]
         private readonly string $apiKey,
         private readonly string $baseUrl,
         private readonly int $maxRetries,
@@ -155,7 +157,7 @@ final class Transport
                     'auth' => null,
                 ]);
             } catch (GuzzleException $e) {
-                throw self::transportError($e, 'export download', null);
+                throw self::transportError($e, 'export download', false);
             }
             $status = $response->getStatusCode();
             if ($status === 200) {
@@ -262,7 +264,7 @@ final class Transport
                     continue;
                 }
 
-                throw self::transportError($e, 'request', $e);
+                throw self::transportError($e, 'request', true);
             }
             try {
                 if ($this->responseHook !== null) {
@@ -346,8 +348,14 @@ final class Transport
         return $data;
     }
 
-    private static function transportError(GuzzleException $e, string $action, ?\Throwable $previous): ConnectionException
+    /**
+     * Guzzle's exception is not chained, because its request holds the API key. Its message
+     * is kept as the cause unless it could hold a presigned URL.
+     */
+    private static function transportError(GuzzleException $e, string $action, bool $keepMessage): ConnectionException
     {
+        $previous = $keepMessage ? new RuntimeException($e->getMessage()) : null;
+
         return preg_match('/timed out/i', $e->getMessage()) === 1
             ? new TimeoutException("synthient: {$action} timed out", 0, $previous)
             : new ConnectionException("synthient: {$action} failed", 0, $previous);

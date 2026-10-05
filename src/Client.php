@@ -93,6 +93,7 @@ final class Client
      * @throws InvalidArgumentException when the API key is missing or an option is invalid
      */
     public function __construct(
+        #[\SensitiveParameter]
         ?string $apiKey = null,
         string $baseUrl = self::DEFAULT_BASE_URL,
         int $maxRetries = 2,
