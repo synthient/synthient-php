@@ -157,6 +157,14 @@ final class LookupTest extends TestCase
         self::assertSame(1, $calls);
     }
 
+    public function testBilledLookupsKeepTheClientsCurlOptions(): void
+    {
+        $client = $this->client([self::json(200, Fixtures::ipInfo())], ['curl' => [CURLOPT_PROXY => 'http://proxy.test:3128']]);
+        $client->lookupIp('8.8.8.8');
+
+        self::assertSame([CURLOPT_FRESH_CONNECT => true, CURLOPT_PROXY => 'http://proxy.test:3128'], $this->history[0]['options']['curl'] ?? null);
+    }
+
     public function testLookupDomain(): void
     {
         $client = $this->client([self::json(200, Fixtures::domain()), self::json(200, Fixtures::domain())]);

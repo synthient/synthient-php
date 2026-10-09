@@ -49,6 +49,9 @@ final class Transport
     private readonly ClientInterface $http;
     private readonly bool $defaultHttp;
 
+    /** @var array<int|string, mixed> */
+    private readonly array $curlDefaults;
+
     /** @var Closure(float): void */
     private Closure $sleep;
 
@@ -68,6 +71,8 @@ final class Transport
     ) {
         $this->http = $http ?? new GuzzleClient();
         $this->defaultHttp = $http === null;
+        $curl = $http instanceof GuzzleClient ? $http->getConfig('curl') : null;
+        $this->curlDefaults = \is_array($curl) ? $curl : [];
         $this->sleep = static function (float $seconds): void {
             time_nanosleep((int) $seconds, (int) (fmod($seconds, 1) * 1e9));
         };
@@ -245,8 +250,8 @@ final class Transport
         if ($policy === RetryPolicy::Billed && \defined('CURLOPT_FRESH_CONNECT')) {
             // libcurl silently resends a request whose reused connection dies before the
             // response starts, which could charge a lookup twice. A fresh connection is
-            // never resent.
-            $options['curl'] = [CURLOPT_FRESH_CONNECT => true];
+            // never resent. A request's curl option replaces the client's, so keep those.
+            $options['curl'] = [CURLOPT_FRESH_CONNECT => true] + $this->curlDefaults;
         }
 
         for ($attempt = 0; ; $attempt++) {
