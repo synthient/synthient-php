@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Synthient\Tests;
 
 use DateTimeImmutable;
+use GuzzleHttp\Exception\GuzzleException;
 use GuzzleHttp\Exception\InvalidArgumentException as GuzzleInvalidArgumentException;
 use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\Promise\PromiseInterface;
@@ -139,6 +140,21 @@ final class LookupTest extends TestCase
         self::assertSame(2, $calls);
         self::assertCount(1, $this->history);
         self::assertArrayNotHasKey('curl', $this->history[0]['options']);
+    }
+
+    public function testBilledLookupsFailWhenTheHandlerRequiresConnectionReuse(): void
+    {
+        $calls = 0;
+        $handler = static function () use (&$calls): PromiseInterface {
+            $calls++;
+
+            throw new GuzzleInvalidArgumentException('The CURLOPT_FRESH_CONNECT cURL option cannot be used when persistent cURL sharing is required because it disables connection reuse.');
+        };
+
+        $e = self::thrown(InvalidArgumentException::class, fn() => $this->client($handler)->lookupIp('8.8.8.8'));
+        self::assertNotInstanceOf(GuzzleException::class, $e);
+        self::assertStringContainsString('persistent cURL sharing', $e->getMessage());
+        self::assertSame(1, $calls);
     }
 
     public function testLookupDomain(): void

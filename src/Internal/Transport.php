@@ -44,6 +44,7 @@ final class Transport
     private const int MAX_RETRY_AFTER = 60;
     private const int MAX_RETRY_AFTER_HEADER = 2 ** 31;
     private const string TLS_FAILURE = '/cURL error (35|51|53|54|58|59|60|64|66|77|80|82|83|90|91|98):|certificate verify failed/i';
+    private const string STREAM_HANDLER_REJECTS_CURL = '"curl" request option to the stream handler is not supported';
 
     private readonly ClientInterface $http;
     private readonly bool $defaultHttp;
@@ -244,8 +245,7 @@ final class Transport
         if ($policy === RetryPolicy::Billed && \defined('CURLOPT_FRESH_CONNECT')) {
             // libcurl silently resends a request whose reused connection dies before the
             // response starts, which could charge a lookup twice. A fresh connection is
-            // never resent. Handlers that take no cURL options, such as Guzzle 8's stream
-            // handler, reject it before sending anything, and the request goes without it.
+            // never resent.
             $options['curl'] = [CURLOPT_FRESH_CONNECT => true];
         }
 
@@ -254,11 +254,19 @@ final class Transport
             try {
                 $response = $this->http->send(new Request($method, $url, $headers, $payload), $options);
             } catch (GuzzleException $e) {
-                if ($e instanceof GuzzleInvalidArgumentException && isset($options['curl'])) {
-                    unset($options['curl']);
-                    $attempt--;
+                if ($e instanceof GuzzleInvalidArgumentException) {
+                    // Guzzle 8's stream handler rejects cURL options before sending anything,
+                    // and it never reuses a connection, so the lookup can go without them. Any
+                    // other rejection, such as from a cURL handler that requires persistent
+                    // connection sharing, must not drop the fresh connection.
+                    if (isset($options['curl']) && str_contains($e->getMessage(), self::STREAM_HANDLER_REJECTS_CURL)) {
+                        unset($options['curl']);
+                        $attempt--;
 
-                    continue;
+                        continue;
+                    }
+
+                    throw new InvalidArgumentException('synthient: the httpClient rejected the request: ' . $e->getMessage());
                 }
                 $transient = $e instanceof TransferException && preg_match(self::TLS_FAILURE, $e->getMessage()) !== 1;
                 if ($canRetry && $policy === RetryPolicy::Transient && $transient) {

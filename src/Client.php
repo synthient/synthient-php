@@ -42,9 +42,11 @@ use Synthient\Model\IpInfo;
  *
  * A Guzzle client passed as httpClient keeps its defaults, such as proxy, verify, and cert,
  * except that the SDK sets allow_redirects, http_errors, stream, and timeouts on every
- * request and replaces the curl option on lookups to force a fresh connection, unless the
- * handler rejects cURL options. Export downloads drop its default headers, cookies, and
- * auth. It must not retry requests or set a default query, and streams and downloads need a
+ * request and replaces the curl option on lookups to force a fresh connection. Lookups
+ * through Guzzle's stream handler, which never reuses connections, go without it, and
+ * lookups through a client that requires persistent cURL sharing throw
+ * InvalidArgumentException. Export downloads drop its default headers, cookies, and auth.
+ * It must not retry requests or set a default query, and streams and downloads need a
  * handler that streams response bodies, such as Guzzle's default.
  */
 final class Client
