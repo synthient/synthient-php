@@ -6,6 +6,7 @@ namespace Synthient\Tests;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use Synthient\Event\HeliosDnsEvent;
+use Synthient\Event\HttpRequestDetails;
 use Synthient\Exception\SynthientException;
 use Synthient\Internal\Decoder;
 use Synthient\Model\Account;
@@ -75,6 +76,13 @@ final class DecoderTest extends TestCase
         $body['ip'] = ['secret-value'];
         $e = self::thrown(SynthientException::class, static fn() => Decoder::decode(IpInfo::class, json_encode($body, JSON_THROW_ON_ERROR)));
         self::assertStringNotContainsString('secret-value', $e->getMessage());
+    }
+
+    public function testErrorsNeverIncludeMapKeys(): void
+    {
+        $e = self::thrown(SynthientException::class, static fn() => Decoder::decode(HttpRequestDetails::class, '{"headers":{"x\r\nforged log line":1}}'));
+
+        self::assertSame('synthient: invalid response: headers.* must be a string', $e->getMessage());
     }
 
     /**

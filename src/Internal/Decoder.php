@@ -18,7 +18,7 @@ use Synthient\Exception\SynthientException;
  * are all rejected where an integer is expected. Nullable parameters accept an absent or
  * null field. Unknown fields are ignored. Integer timestamps of at least 1e12 are read as
  * milliseconds and smaller ones as seconds; string timestamps must be RFC 3339. Errors name
- * the field path and never include values.
+ * the field path and never include values or map keys.
  *
  * JSON is decoded into arrays rather than objects, because PHP objects cannot hold every
  * valid key, such as one starting with a NUL byte. An empty object and an empty list are
@@ -121,7 +121,7 @@ final class Decoder
             $element = substr($type, 4, -1);
             $items = [];
             foreach ($value as $key => $item) {
-                $items[$key] = self::value($element, $item, "{$path}.{$key}");
+                $items[$key] = self::value($element, $item, "{$path}.*");
             }
 
             return $items;
