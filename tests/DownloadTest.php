@@ -6,6 +6,7 @@ namespace Synthient\Tests;
 
 use GuzzleHttp\Cookie\CookieJar;
 use GuzzleHttp\Psr7\Response;
+use Psr\Http\Message\ResponseInterface;
 use Synthient\Client;
 use Synthient\Exception\ApiException;
 use Synthient\Exception\ConnectionException;
@@ -97,6 +98,18 @@ final class DownloadTest extends TestCase
 
         $e = self::thrown(SynthientException::class, static fn() => $client->proxies->downloadUrl('latest'));
         self::assertStringContainsString('does not use https', $e->getMessage());
+    }
+
+    public function testRedirectErrorTracesHoldNoPresignedUrl(): void
+    {
+        $responses = [self::redirect(self::SIGNED), self::redirect('http://storage.test/b')];
+        $args = self::traceArguments(SynthientException::class, fn() => $this->client($responses)->proxies->download('latest'));
+
+        self::assertNotSame([], $args);
+        foreach ($args as $arg) {
+            self::assertNotInstanceOf(ResponseInterface::class, $arg);
+            self::assertFalse(\is_string($arg) && str_contains($arg, 'secret-signature'));
+        }
     }
 
     public function testRedirectLimit(): void

@@ -105,6 +105,33 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
     }
 
     /**
+     * Runs $fn with trace arguments recorded, as a development ini does, and returns every
+     * argument in the traces of the $class exception it throws and of its causes.
+     *
+     * @param class-string<Throwable> $class
+     *
+     * @return list<mixed>
+     */
+    protected static function traceArguments(string $class, callable $fn): array
+    {
+        $ignoreArgs = (string) \ini_get('zend.exception_ignore_args');
+        ini_set('zend.exception_ignore_args', '0');
+        try {
+            $e = self::thrown($class, $fn);
+        } finally {
+            ini_set('zend.exception_ignore_args', $ignoreArgs);
+        }
+        $args = [];
+        for (; $e !== null; $e = $e->getPrevious()) {
+            foreach ($e->getTrace() as $frame) {
+                array_push($args, ...$frame['args'] ?? []);
+            }
+        }
+
+        return $args;
+    }
+
+    /**
      * Runs $fn and returns the $class exception it throws. Other exceptions propagate.
      *
      * @template E of Throwable

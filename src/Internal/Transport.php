@@ -368,8 +368,12 @@ final class Transport
      * Guzzle's exception is not chained, because its request holds the API key. Its message
      * is kept as the cause unless it could hold a presigned URL.
      */
-    private static function transportError(GuzzleException $e, string $action, bool $keepMessage): ConnectionException
-    {
+    private static function transportError(
+        #[\SensitiveParameter]
+        GuzzleException $e,
+        string $action,
+        bool $keepMessage,
+    ): ConnectionException {
         $previous = $keepMessage ? new RuntimeException($e->getMessage()) : null;
         $timedOut = $e instanceof ConnectTimeoutException
             || $e instanceof NetworkTimeoutException
@@ -425,8 +429,12 @@ final class Transport
      * and no credentials, and an https request never redirects to http. Errors never include
      * the URL, which is presigned.
      */
-    private static function redirectTarget(string $from, ResponseInterface $response): string
-    {
+    private static function redirectTarget(
+        #[\SensitiveParameter]
+        string $from,
+        #[\SensitiveParameter]
+        ResponseInterface $response,
+    ): string {
         $location = trim($response->getHeaderLine('Location'));
         try {
             $base = new Uri($from);

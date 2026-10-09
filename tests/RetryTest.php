@@ -6,9 +6,11 @@ namespace Synthient\Tests;
 
 use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Exception\ConnectTimeoutException;
+use GuzzleHttp\Exception\GuzzleException;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Psr\Http\Message\RequestInterface;
 use Synthient\Exception\ApiException;
 use Synthient\Exception\ConnectionException;
 use Synthient\Exception\TimeoutException;
@@ -106,6 +108,17 @@ final class RetryTest extends TestCase
         self::assertNotInstanceOf(ConnectException::class, $e->getPrevious());
         self::assertSame('cURL error 56: Connection reset by peer', $e->getPrevious()?->getMessage());
         self::assertCount(1, $this->history);
+    }
+
+    public function testTransportErrorTracesHoldNoRequest(): void
+    {
+        $args = self::traceArguments(ConnectionException::class, fn() => $this->client([self::dropped()], maxRetries: 0)->account());
+
+        self::assertNotSame([], $args);
+        foreach ($args as $arg) {
+            self::assertNotInstanceOf(GuzzleException::class, $arg);
+            self::assertNotInstanceOf(RequestInterface::class, $arg);
+        }
     }
 
     public function testTlsErrorsAreNotRetried(): void
