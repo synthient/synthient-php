@@ -169,6 +169,27 @@ final class StreamTest extends TestCase
         iterator_to_array($this->client([self::ndjson($body)])->proxies->stream());
     }
 
+    public function testOversizedEventEndingInANewline(): void
+    {
+        $line = '{"ip":"' . str_repeat('a', EventStream::MAX_EVENT_SIZE - 8) . '"}';
+        $body = Utils::streamFor($line . "\n");
+        [$events, $error] = self::drain($this->client([self::ndjson($body)])->proxies->stream());
+
+        self::assertInstanceOf(SynthientException::class, $error);
+        self::assertStringContainsString('stream event exceeds', $error->getMessage());
+        self::assertCount(0, $events);
+        self::assertNull($body->detach());
+    }
+
+    public function testEventAtTheSizeLimit(): void
+    {
+        $line = '{"ip":"' . str_repeat('a', EventStream::MAX_EVENT_SIZE - 9) . '"}';
+        $events = iterator_to_array($this->client([self::ndjson($line . "\n")])->proxies->stream());
+
+        self::assertCount(1, $events);
+        self::assertSame(EventStream::MAX_EVENT_SIZE - 9, \strlen((string) $events[0]->ip));
+    }
+
     public function testStreamsAreSingleUseAndClosed(): void
     {
         $body = Utils::streamFor("{\"ip\":\"203.0.113.7\"}\n{\"ip\":\"203.0.113.8\"}\n");

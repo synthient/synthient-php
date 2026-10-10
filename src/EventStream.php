@@ -61,6 +61,9 @@ final class EventStream implements IteratorAggregate
                     $lines = explode("\n", $buffer);
                     $buffer = array_pop($lines);
                     foreach ($lines as $line) {
+                        if (\strlen($line) > self::MAX_EVENT_SIZE) {
+                            throw new SynthientException('synthient: stream event exceeds ' . self::MAX_EVENT_SIZE . ' bytes');
+                        }
                         $line = trim($line);
                         if ($line !== '') {
                             yield Decoder::decode($this->event, $line);
