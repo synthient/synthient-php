@@ -141,7 +141,11 @@ final class Decoder
         if (\is_int($value) && $value >= 0) {
             return (string) $value;
         }
-        if (\is_string($value) && preg_match('/^\d{1,20}$/', $value) === 1) {
+        if (
+            \is_string($value)
+            && preg_match('/^\d{1,20}$/D', $value) === 1
+            && (\strlen($value) < 20 || strcmp($value, '18446744073709551615') <= 0)
+        ) {
             return $value;
         }
 

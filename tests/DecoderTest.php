@@ -130,7 +130,7 @@ final class DecoderTest extends TestCase
 
         self::assertSame('18446744073709551615', Decoder::decode(HeliosDnsEvent::class, $event('18446744073709551615'))->tunnelId);
         self::assertSame('0', Decoder::decode(HeliosDnsEvent::class, $event('0'))->tunnelId);
-        foreach (['-1', '-9223372036854775809', '1.5', '"x"', 'true'] as $id) {
+        foreach (['-1', '-9223372036854775809', '18446744073709551616', '99999999999999999999', '1.5', '"x"', '"1\\n"', 'true'] as $id) {
             $e = self::thrown(SynthientException::class, static fn() => Decoder::decode(HeliosDnsEvent::class, $event($id)));
             self::assertStringContainsString('tunnel_id must be an unsigned integer', $e->getMessage(), $id);
         }
