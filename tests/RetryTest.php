@@ -4,13 +4,18 @@ declare(strict_types=1);
 
 namespace Synthient\Tests;
 
+use GuzzleHttp\Client as GuzzleClient;
 use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Exception\ConnectTimeoutException;
 use GuzzleHttp\Exception\GuzzleException;
+use GuzzleHttp\Handler\MockHandler;
+use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\RequiresFunction;
 use Psr\Http\Message\RequestInterface;
+use Synthient\Client;
 use Synthient\Exception\ApiException;
 use Synthient\Exception\ConnectionException;
 use Synthient\Exception\TimeoutException;
@@ -67,6 +72,32 @@ final class RetryTest extends TestCase
         $this->client([self::problem(503, ['Retry-After' => '3']), self::json(200, Fixtures::account())])->account();
 
         self::assertGreaterThanOrEqual(3.0, $this->sleeps[0]);
+    }
+
+    #[RequiresFunction('pcntl_alarm')]
+    public function testRetryAfterIsStillHonoredWhenASignalInterruptsSleep(): void
+    {
+        $handler = new MockHandler([self::problem(429, ['Retry-After' => '2']), self::json(200, Fixtures::account())]);
+        $client = new Client(apiKey: self::KEY, httpClient: new GuzzleClient(['handler' => HandlerStack::create($handler)]));
+        $previousHandler = pcntl_signal_get_handler(SIGALRM);
+        $previousAsync = pcntl_async_signals(true);
+        $interrupted = false;
+        pcntl_signal(SIGALRM, static function () use (&$interrupted): void {
+            $interrupted = true;
+        });
+        try {
+            pcntl_alarm(1);
+            $start = hrtime(true);
+            $client->account();
+            $elapsed = (hrtime(true) - $start) / 1e9;
+        } finally {
+            pcntl_alarm(0);
+            pcntl_signal(SIGALRM, $previousHandler);
+            pcntl_async_signals($previousAsync);
+        }
+
+        self::assertTrue($interrupted);
+        self::assertGreaterThanOrEqual(2.0, $elapsed);
     }
 
     public function testLongRetryAfterIsNotWaitedFor(): void

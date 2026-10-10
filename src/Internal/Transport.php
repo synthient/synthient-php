@@ -74,7 +74,10 @@ final class Transport
         $curl = $http instanceof GuzzleClient ? $http->getConfig('curl') : null;
         $this->curlDefaults = \is_array($curl) ? $curl : [];
         $this->sleep = static function (float $seconds): void {
-            time_nanosleep((int) $seconds, (int) (fmod($seconds, 1) * 1e9));
+            $remaining = time_nanosleep((int) $seconds, (int) (fmod($seconds, 1) * 1e9));
+            while (\is_array($remaining)) {
+                $remaining = time_nanosleep($remaining['seconds'], $remaining['nanoseconds']);
+            }
         };
     }
 
