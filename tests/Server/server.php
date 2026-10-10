@@ -16,7 +16,7 @@ posix_setpgid(0, 0);
 
 [, $script, $log] = $_SERVER['argv'];
 $connections = json_decode((string) file_get_contents($script), true, 512, JSON_THROW_ON_ERROR);
-$server = stream_socket_server('tcp://127.0.0.1:0', $errno, $error);
+$server = @stream_socket_server('tcp://127.0.0.1:0', $errno, $error);
 if ($server === false) {
     fwrite(STDERR, "listen failed: {$error}\n");
     exit(1);
