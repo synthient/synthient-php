@@ -54,10 +54,10 @@ final class AccountTest extends TestCase
             new Response(401, ['Content-Type' => 'text/plain'], '401 invalid api key'),
         ];
         foreach ($cases as $response) {
-            $this->history = [];
+            $sent = \count($this->history);
             $e = self::thrown(ApiException::class, fn() => $this->client([$response, self::json(200, ['status' => 'ok'])])->health());
             self::assertSame($response->getStatusCode(), $e->statusCode);
-            self::assertCount(1, $this->history);
+            self::assertCount($sent + 1, $this->history);
         }
     }
 }

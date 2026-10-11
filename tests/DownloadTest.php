@@ -84,11 +84,11 @@ final class DownloadTest extends TestCase
             'empty location' => [self::redirect('')],
         ];
         foreach ($cases as $name => $responses) {
-            $this->history = [];
+            $sent = \count($this->history);
             $e = self::thrown(SynthientException::class, fn() => $this->client($responses)->proxies->download('latest'));
             self::assertNotInstanceOf(ApiException::class, $e, $name);
             self::assertStringNotContainsString('secret-signature', (string) $e, $name);
-            self::assertCount(\count($responses), $this->history, $name);
+            self::assertCount($sent + \count($responses), $this->history, $name);
         }
     }
 
@@ -138,10 +138,10 @@ final class DownloadTest extends TestCase
         self::assertNull($e->detail);
         self::assertStringNotContainsString('secret-signature', (string) $e);
 
-        $this->history = [];
+        $sent = \count($this->history);
         $e = self::thrown(ConnectionException::class, fn() => $this->client([self::redirect(self::SIGNED), self::dropped('Could not resolve ' . self::SIGNED), new Response(200)])->proxies->download('latest'));
         self::assertNull($e->getPrevious());
         self::assertStringNotContainsString('secret-signature', (string) $e);
-        self::assertCount(2, $this->history);
+        self::assertCount($sent + 2, $this->history);
     }
 }
