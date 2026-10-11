@@ -54,7 +54,14 @@ final class EventStream implements IteratorAggregate
 
         try {
             $buffer = '';
-            while (!$this->closed && !$this->body->eof()) {
+            while (!$this->closed) {
+                if ($this->body->eof()) {
+                    $line = trim($buffer);
+                    if ($line !== '') {
+                        yield Decoder::decode($this->event, $line);
+                    }
+                    break;
+                }
                 $chunk = $this->body->read(65536);
                 $buffer .= $chunk;
                 if (str_contains($chunk, "\n")) {
@@ -73,10 +80,6 @@ final class EventStream implements IteratorAggregate
                 if (\strlen($buffer) > self::MAX_EVENT_SIZE) {
                     throw new SynthientException('synthient: stream event exceeds ' . self::MAX_EVENT_SIZE . ' bytes');
                 }
-            }
-            $line = trim($buffer);
-            if ($line !== '' && !$this->closed) {
-                yield Decoder::decode($this->event, $line);
             }
         } finally {
             $this->close();
