@@ -58,7 +58,8 @@ final readonly class Feed
     /**
      * Lists one page of exports, newest first.
      *
-     * @param int|null $limit the page size, from 1 to 500; the API defaults to 100
+     * @param int|null $limit the page size, at least 1; the API defaults to 100 and clamps
+     *                        values above 500
      * @param string|null $cursor the nextCursor of the previous page
      */
     public function listExports(?int $limit = null, ?string $cursor = null): ExportPage
@@ -137,8 +138,8 @@ final readonly class Feed
 
     private static function checkLimit(?int $limit): void
     {
-        if ($limit !== null && ($limit < 1 || $limit > 500)) {
-            throw new InvalidArgumentException('limit must be from 1 to 500');
+        if ($limit !== null && $limit < 1) {
+            throw new InvalidArgumentException('limit must be at least 1');
         }
     }
 

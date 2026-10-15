@@ -222,16 +222,16 @@ final class Client
      * Looks up the proxy traffic Synthient has observed for a domain over the last 30 days.
      * It costs one credit. Send internationalized names as Punycode.
      *
-     * @param int|null $limit how many entries the top lists and recent events hold, from 1 to
-     *                        1,000; the API defaults to 50
+     * @param int|null $limit how many entries the top lists and recent events hold, at least 1;
+     *                        the API defaults to 50 and clamps values above 1,000
      */
     public function lookupDomain(string $domain, ?int $limit = null): DomainInfo
     {
         if ($domain === '' || $domain === '.' || $domain === '..') {
             throw new InvalidArgumentException('invalid domain');
         }
-        if ($limit !== null && ($limit < 1 || $limit > 1000)) {
-            throw new InvalidArgumentException('limit must be from 1 to 1,000');
+        if ($limit !== null && $limit < 1) {
+            throw new InvalidArgumentException('limit must be at least 1');
         }
 
         $path = '/lookup/domain/' . rawurlencode($domain);

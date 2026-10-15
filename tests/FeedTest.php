@@ -93,11 +93,18 @@ final class FeedTest extends TestCase
     public function testExportListingsRejectInvalidLimits(): void
     {
         $feed = $this->client([])->proxies;
-        foreach ([0, 501] as $limit) {
+        foreach ([0, -1] as $limit) {
             self::thrown(InvalidArgumentException::class, static fn() => $feed->listExports(limit: $limit));
             self::thrown(InvalidArgumentException::class, static fn() => $feed->allExports(limit: $limit));
         }
         self::assertSame([], $this->history);
+    }
+
+    public function testExportListingsLeaveLargeLimitsToTheApi(): void
+    {
+        $this->client([self::json(200, Fixtures::exportPage([]))])->proxies->listExports(limit: 1000);
+
+        self::assertSame('limit=1000', $this->request()->getUri()->getQuery());
     }
 
     public function testAllExportsFollowsCursorsThroughEmptyPages(): void

@@ -167,13 +167,15 @@ final class LookupTest extends TestCase
 
     public function testLookupDomain(): void
     {
-        $client = $this->client([self::json(200, Fixtures::domain()), self::json(200, Fixtures::domain())]);
+        $client = $this->client([self::json(200, Fixtures::domain()), self::json(200, Fixtures::domain()), self::json(200, Fixtures::domain())]);
         $domain = $client->lookupDomain('example.com', limit: 10);
         $client->lookupDomain('a/b?c d');
+        $client->lookupDomain('example.com', limit: 5000);
 
         self::assertSame(self::BASE_URL . '/lookup/domain/example.com?limit=10', (string) $this->request(0)->getUri());
         self::assertSame('/api/v4/lookup/domain/a%2Fb%3Fc%20d', $this->request(1)->getUri()->getPath());
         self::assertSame('', $this->request(1)->getUri()->getQuery());
+        self::assertSame('limit=5000', $this->request(2)->getUri()->getQuery());
         self::assertSame(DomainStatus::ACTIVE, $domain->status);
         self::assertSame(Cadence::BURST_DRIVEN, $domain->activityStats->cadence);
         self::assertSame(5, $domain->stats->events24h);
@@ -204,7 +206,7 @@ final class LookupTest extends TestCase
             self::thrown(InvalidArgumentException::class, static fn() => $client->lookupDomain($domain));
         }
         self::thrown(InvalidArgumentException::class, static fn() => $client->lookupDomain('example.com', limit: 0));
-        self::thrown(InvalidArgumentException::class, static fn() => $client->lookupDomain('example.com', limit: 1001));
+        self::thrown(InvalidArgumentException::class, static fn() => $client->lookupDomain('example.com', limit: -1));
         self::assertSame([], $this->history);
     }
 }
