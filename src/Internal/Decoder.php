@@ -189,7 +189,6 @@ final class Decoder
                 'type' => match (true) {
                     $wire?->type !== null => $wire->type,
                     $wire?->list !== null => "list<{$wire->list}>",
-                    $wire?->map !== null => "map<{$wire->map}>",
                     default => $type->getName(),
                 },
                 'nullable' => $type->allowsNull(),

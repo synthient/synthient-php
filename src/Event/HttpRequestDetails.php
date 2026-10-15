@@ -19,7 +19,7 @@ final readonly class HttpRequestDetails
         public ?string $method = null,
         public ?string $uri = null,
         public ?string $version = null,
-        #[Wire(map: 'string')]
+        #[Wire(type: 'map<string>')]
         public ?array $headers = null,
     ) {}
 }

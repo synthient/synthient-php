@@ -17,13 +17,12 @@ final readonly class Wire
     /**
      * @param string|null $name the JSON name, when it is not the snake_case form of the property
      * @param string|null $list the element type of a list: string, int, a class, or a nested list<...>
-     * @param string|null $map the value type of a JSON object read into an array keyed by name
-     * @param string|null $type a type the native one cannot express: uint64, read into a string
+     * @param string|null $type a type the native one cannot express: uint64, read into a string,
+     *                          or map<...>, a JSON object read into an array keyed by name
      */
     public function __construct(
         public ?string $name = null,
         public ?string $list = null,
-        public ?string $map = null,
         public ?string $type = null,
     ) {}
 }
