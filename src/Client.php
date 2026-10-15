@@ -42,9 +42,9 @@ use Synthient\Model\IpInfo;
  *
  * A Guzzle client passed as httpClient keeps its defaults, such as proxy, verify, and cert,
  * except that the SDK sets allow_redirects, http_errors, stream, and timeouts on every
- * request and adds CURLOPT_FRESH_CONNECT to its curl option on lookups. Lookups through
- * Guzzle's stream handler, which never reuses connections, go without it, and lookups
- * through a client that requires persistent cURL sharing throw InvalidArgumentException.
+ * request and adds CURLOPT_FRESH_CONNECT to its curl option on lookups and health(). Those
+ * requests go without it through Guzzle's stream handler, which never reuses connections,
+ * and throw InvalidArgumentException through a client that requires persistent cURL sharing.
  * Export downloads drop its default headers, cookies, and auth. It must not retry requests
  * or set a default query, and streams and downloads need a handler that streams response
  * bodies, such as Guzzle's default.
@@ -173,7 +173,7 @@ final class Client
      */
     public function health(): void
     {
-        $this->transport->request(null, 'GET', '/health', RetryPolicy::RateLimit);
+        $this->transport->request(null, 'GET', '/health', RetryPolicy::Billed);
     }
 
     /**
