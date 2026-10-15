@@ -86,8 +86,9 @@ final class Client
      * @param string $baseUrl the API base URL, including the version path
      * @param int $maxRetries how many times a failed request is retried; 0 disables retries
      * @param float $connectTimeout seconds to wait for a connection
-     * @param float $timeout seconds to wait for a whole response, or for the next data on a
-     *                       stream or download; the API sends a stream keepalive every 15 seconds
+     * @param float $timeout seconds each attempt waits for a whole response, or for the next data
+     *                       on a stream or download; retries get a fresh timeout, so it does not
+     *                       bound a whole call. The API sends a stream keepalive every 15 seconds
      * @param ClientInterface|null $httpClient a Guzzle client, for proxies, TLS settings, or a custom handler
      * @param string|null $userAgent appended to the User-Agent header, such as "my-app/1.2"
      * @param (Closure(ResponseMetadata): void)|null $responseHook called with every API response
