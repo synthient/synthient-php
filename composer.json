@@ -1,0 +1,10 @@
+{
+  "name": "synthient/synthient-php",
+  "description": "Synthient API client for PHP",
+  "type": "library",
+  "autoload": {
+    "psr-4": {
+      "Synthient\\": "src/"
+    }
+  }
+}
