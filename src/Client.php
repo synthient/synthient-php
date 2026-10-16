@@ -29,11 +29,13 @@ use Synthient\Model\IpInfo;
  *
  * Create one client and reuse it. Constructing it makes no requests.
  *
- * Requests that cost no credits are retried on 429, 500, 502, 503, and 504 responses and on
- * transport failures, except health(), which retries only 429. Billed lookups are retried
- * only on 429, which the API returns before doing any work, and are never resent on a
- * reused connection. Retries back off exponentially with jitter and honor Retry-After up to
- * one minute. A 429 without Retry-After is not retried, because it means the key's monthly
+ * Account and feed requests are retried on 500, 502, 503, and 504 responses, on transport
+ * failures other than TLS errors, and on 429 responses that carry Retry-After. A failure while
+ * reading a stream or download is not retried, and neither is a download's request to the
+ * storage host. Billed lookups and health() are retried only on 429 responses that carry
+ * Retry-After, which the API returns before doing any work, and are never resent on a reused
+ * connection. Retries back off exponentially with jitter and honor Retry-After up to one
+ * minute. A 429 without Retry-After is not retried, because it means the key's monthly
  * request budget is spent or too many of its streams are open.
  *
  * Errors throw ApiException for an error status, ConnectionException or TimeoutException for
@@ -85,7 +87,9 @@ final class Client
      * @param string|null $apiKey the API key; defaults to the SYNTHIENT_API_KEY environment variable
      * @param string $baseUrl the API base URL, including the version path
      * @param int $maxRetries how many times a failed request is retried; 0 disables retries
-     * @param float $connectTimeout seconds to wait for a connection
+     * @param float $connectTimeout seconds to wait for a connection. Guzzle's stream handler, which
+     *                              serves streams, downloads, and every request without the cURL
+     *                              extension, ignores it and waits up to $timeout to connect
      * @param float $timeout seconds each attempt waits for a whole response, or for the next data
      *                       on a stream or download; retries get a fresh timeout, so it does not
      *                       bound a whole call. The API sends a stream keepalive every 15 seconds
@@ -222,8 +226,8 @@ final class Client
      * Looks up the proxy traffic Synthient has observed for a domain over the last 30 days.
      * It costs one credit. Send internationalized names as Punycode.
      *
-     * @param int|null $limit how many entries the top lists and recent events hold, at least 1;
-     *                        the API defaults to 50 and clamps values above 1,000
+     * @param int|null $limit how many recent events to return, at least 1; the API defaults to 50
+     *                        and clamps values above 1,000. The top lists are not capped
      */
     public function lookupDomain(string $domain, ?int $limit = null): DomainInfo
     {

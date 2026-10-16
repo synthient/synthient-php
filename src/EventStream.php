@@ -8,7 +8,9 @@ use Generator;
 use IteratorAggregate;
 use LogicException;
 use Psr\Http\Message\StreamInterface;
+use Synthient\Exception\ConnectionException;
 use Synthient\Exception\SynthientException;
+use Synthient\Exception\TimeoutException;
 use Synthient\Internal\Decoder;
 
 /**
@@ -43,7 +45,9 @@ final class EventStream implements IteratorAggregate
     /**
      * @return Generator<int, T>
      *
-     * @throws SynthientException when the connection fails or an event is malformed
+     * @throws ConnectionException when a read fails
+     * @throws TimeoutException when a read times out
+     * @throws SynthientException when an event is malformed
      */
     public function getIterator(): Generator
     {
