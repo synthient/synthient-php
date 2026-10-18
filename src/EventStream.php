@@ -16,7 +16,7 @@ use Synthient\Internal\Decoder;
 /**
  * An open connection to a real-time feed, from Feed::stream().
  *
- * Iterate it once to receive events as they arrive. The server ends a stream after about 30
+ * Iterate it once to receive events as they arrive. The server ends a stream after up to 30
  * minutes, and iteration then stops without an error, so reconnect in a loop. Events sent
  * between connections are missed. Call close() when you stop early, ideally in a finally
  * block, so the connection is not held until garbage collection.
