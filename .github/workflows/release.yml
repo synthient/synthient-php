@@ -1,4 +1,4 @@
-name: Release
+name: release
 
 on:
   push:
@@ -10,12 +10,20 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     environment: release
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - run: composer validate
+      - name: Check the tag matches the SDK version
+        run: |
+          version=$(sed -n "s/.*const string VERSION = '\(.*\)';$/\1/p" src/Client.php)
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::$GITHUB_REF_NAME does not match the SDK version $version"
+            exit 1
+          fi
+      - run: composer validate --strict
       - run: gh release create "$GITHUB_REF_NAME" --generate-notes
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
