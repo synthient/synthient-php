@@ -282,7 +282,7 @@ The client waits up to 10 seconds (`connectTimeout`) for a connection and up to 
 $client = new Synthient\Client(connectTimeout: 5.0, timeout: 30.0);
 ```
 
-A request or read that takes too long throws a `TimeoutException`. On Guzzle 7, a stream or download that can't connect in time throws its parent, `ConnectionException`, because Guzzle 7 reports it as a refused connection, so catch `ConnectionException` to handle both.
+A connection, a response, or a read that takes too long throws a `TimeoutException`.
 
 ## Error Handling
 

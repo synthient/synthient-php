@@ -161,6 +161,7 @@ final class Transport
         $this->requireStreaming();
         $url = $this->downloadUrl($path);
         for ($hop = 0; ; $hop++) {
+            $start = hrtime(true);
             try {
                 $response = $this->http->send(new Request('GET', $url, ['User-Agent' => $this->userAgent]), [
                     ...$this->options(true),
@@ -169,7 +170,7 @@ final class Transport
                     'auth' => null,
                 ]);
             } catch (GuzzleException $e) {
-                throw self::transportError($e, 'export download', false);
+                throw $this->transportError($e, 'export download', false, $start);
             }
             $status = $response->getStatusCode();
             if ($status === 200) {
@@ -259,6 +260,7 @@ final class Transport
 
         for ($attempt = 0; ; $attempt++) {
             $canRetry = $attempt < $this->maxRetries;
+            $start = hrtime(true);
             try {
                 $response = $this->http->send(new Request($method, $url, $headers, $payload), $options);
             } catch (GuzzleException $e) {
@@ -283,7 +285,7 @@ final class Transport
                     continue;
                 }
 
-                throw self::transportError($e, 'request', true);
+                throw $this->transportError($e, 'request', true, $start);
             }
             try {
                 if ($this->responseHook !== null) {
@@ -370,18 +372,25 @@ final class Transport
     /**
      * Guzzle's exception is not chained, because its request holds the API key. Its message
      * is kept as the cause unless it could hold a presigned URL.
+     *
+     * Guzzle's stream handler does not always say that it gave up at the timeout. Guzzle 7
+     * reports any connection that failed as refused, and both majors report a response that
+     * never started as a failed request. A failure that took the whole timeout counts as a
+     * timeout, while a refused connection fails at once.
      */
-    private static function transportError(
+    private function transportError(
         #[\SensitiveParameter]
         GuzzleException $e,
         string $action,
         bool $keepMessage,
+        int $start,
     ): ConnectionException {
         $previous = $keepMessage ? new RuntimeException($e->getMessage()) : null;
         $timedOut = $e instanceof ConnectTimeoutException
             || $e instanceof NetworkTimeoutException
             || $e instanceof ResponseTimeoutException
-            || preg_match('/cURL error 28:|timed out/i', $e->getMessage()) === 1;
+            || preg_match('/cURL error 28:|timed out/i', $e->getMessage()) === 1
+            || (hrtime(true) - $start) / 1e9 >= $this->timeout * 0.95;
 
         return $timedOut
             ? new TimeoutException("synthient: {$action} timed out", 0, $previous)
