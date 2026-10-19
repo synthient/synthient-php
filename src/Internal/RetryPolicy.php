@@ -15,10 +15,9 @@ enum RetryPolicy
     case Transient;
 
     /**
-     * Billed lookups retry only a 429 with Retry-After, which the API returns before doing
-     * any work, and never reuse a connection. A retried server error or dropped connection
-     * could be charged twice. The health check uses it too, so it reports an unhealthy API
-     * at once.
+     * Billed lookups retry only a 429 with Retry-After, which the API sends before doing any
+     * work, and never reuse a connection, since retrying anything else could charge twice.
+     * health() uses it too, so an unhealthy API is reported at once.
      */
     case Billed;
 }

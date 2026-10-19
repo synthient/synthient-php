@@ -31,9 +31,8 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
     protected array $sleeps = [];
 
     /**
-     * Builds a client whose requests are answered by $handler, either a list of responses in
-     * order or a Guzzle handler, and recorded in $this->history. Retries record their delay
-     * in $this->sleeps instead of sleeping.
+     * Builds a client whose requests are answered by $handler and recorded in $this->history.
+     * Retries record their delay in $this->sleeps instead of sleeping.
      *
      * @param list<ResponseInterface|Throwable>|callable $handler
      * @param array<string, mixed> $guzzle more Guzzle client config, such as default headers

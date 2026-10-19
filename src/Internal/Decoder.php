@@ -14,15 +14,13 @@ use Synthient\Exception\SynthientException;
 /**
  * Builds models from JSON by checking each value against the model constructor's types.
  *
- * Required fields must be present with the exact JSON type, so "15169", 15169.0, and null
- * are all rejected where an integer is expected. Nullable parameters accept an absent or
- * null field. Unknown fields are ignored. Integer timestamps of at least 1e12 are read as
- * milliseconds and smaller ones as seconds; string timestamps must be RFC 3339. Errors name
- * the field path and never include values or map keys.
+ * Required fields must be present with the exact JSON type, without coercion. Nullable
+ * parameters accept an absent or null field. Unknown fields are ignored. Integer timestamps
+ * of at least 1e12 are read as milliseconds and smaller ones as seconds; string timestamps
+ * must be RFC 3339. Errors name the field path and never include values or map keys.
  *
- * JSON is decoded into arrays rather than objects, because PHP objects cannot hold every
- * valid key, such as one starting with a NUL byte. An empty object and an empty list are
- * then indistinguishable, so each is accepted where the other is expected.
+ * JSON is decoded into arrays because PHP objects cannot hold every valid key, so an empty
+ * object and an empty list are each accepted for the other.
  *
  * @internal
  */

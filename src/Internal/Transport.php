@@ -152,9 +152,9 @@ final class Transport
     }
 
     /**
-     * Asks the API where an export is stored, then downloads it from storage without the API
-     * key or the client's default headers, cookies, and auth, following up to ten validated
-     * redirects. Nothing is retried, and errors never include the presigned URL.
+     * Downloads an export from storage without the API key or the client's default headers,
+     * cookies, and auth, following up to ten validated redirects. Errors never include the
+     * presigned URL.
      */
     public function openDownload(string $path): StreamInterface
     {
@@ -311,10 +311,9 @@ final class Transport
     }
 
     /**
-     * Returns how long to wait before retrying, or null to stop. A 429 without Retry-After
-     * is not retried, because the rate limiter always sends one: its absence means the key's
-     * monthly budget is spent or too many of its streams are open. A server that asks for
-     * more than a minute gets no retry, so the caller sees the error and its retryAfter.
+     * Returns how long to wait before retrying, or null to stop. The rate limiter always
+     * sends Retry-After, so a 429 without one is final. A Retry-After over a minute is not
+     * waited out, so the caller sees the error and its retryAfter.
      */
     private static function retryDelay(RetryPolicy $policy, ResponseInterface $response, int $attempt): ?float
     {
@@ -437,9 +436,8 @@ final class Transport
     }
 
     /**
-     * Resolves a redirect's Location. It must be an absolute http or https URL with a host
-     * and no credentials, and an https request never redirects to http. Errors never include
-     * the URL, which is presigned.
+     * Resolves and validates a redirect's Location. Errors never include the URL, which is
+     * presigned.
      */
     private static function redirectTarget(
         #[\SensitiveParameter]
