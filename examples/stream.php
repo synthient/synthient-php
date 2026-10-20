@@ -32,7 +32,7 @@ while (true) {
             exit(1);
         }
         fwrite(STDERR, "{$e->getMessage()}, reconnecting\n");
-        // Avoid reconnecting in a tight loop.
+        // Stream connections are limited to 30 per minute per team.
         sleep(2);
     }
 }

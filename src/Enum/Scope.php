@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Synthient\Enum;
 
 /**
- * A permission granted to an API key. BASIC authorizes lookups and account details. The API may add values.
+ * BASIC authorizes lookups and account details. The API may add values.
  */
 final class Scope
 {

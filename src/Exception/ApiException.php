@@ -24,7 +24,7 @@ final class ApiException extends SynthientException
      * @param array<string, list<string>> $errors validation errors by field, from a 422
      * @param string|null $requestId the X-Request-Id header, or the problem's instance
      * @param int|null $retryAfter seconds from the Retry-After header
-     * @param string[][] $headers the response headers
+     * @param string[][] $headers
      */
     public function __construct(
         public readonly int $statusCode,

@@ -6,14 +6,11 @@ namespace Synthient\Event;
 
 use Synthient\Internal\Wire;
 
-/**
- * The parsed request line and headers of a captured HTTP request.
- */
 final readonly class HttpRequestDetails
 {
     /**
      * @param array<array-key, string>|null $headers by name; PHP stores a numeric name such as
-     *                                             "123" as an int key
+     *                                      "123" as an int key
      */
     public function __construct(
         public ?string $method = null,

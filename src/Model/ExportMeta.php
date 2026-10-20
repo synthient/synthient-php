@@ -6,9 +6,6 @@ namespace Synthient\Model;
 
 use DateTimeImmutable;
 
-/**
- * Details of one export, including its Parquet schema.
- */
 final readonly class ExportMeta
 {
     /**

@@ -6,9 +6,6 @@ namespace Synthient\Model;
 
 use Synthient\Internal\Wire;
 
-/**
- * The columns of a Parquet export.
- */
 final readonly class ParquetSchema
 {
     /**

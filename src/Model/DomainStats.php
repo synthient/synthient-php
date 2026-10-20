@@ -6,9 +6,6 @@ namespace Synthient\Model;
 
 use Synthient\Internal\Wire;
 
-/**
- * Event counts for a domain.
- */
 final readonly class DomainStats
 {
     public function __construct(

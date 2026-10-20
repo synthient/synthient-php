@@ -7,9 +7,6 @@ namespace Synthient\Event;
 use DateTimeImmutable;
 use Synthient\Internal\Wire;
 
-/**
- * An HTTP request captured by a Helios honeypot.
- */
 final readonly class HeliosHttpEvent
 {
     /**

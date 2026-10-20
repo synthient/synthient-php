@@ -7,7 +7,7 @@ namespace Synthient\Model;
 use DateTimeImmutable;
 
 /**
- * The API key that made a request. It never includes the secret.
+ * The key's secret is never included.
  */
 final readonly class AccountApiKey
 {

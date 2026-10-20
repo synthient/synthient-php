@@ -4,9 +4,6 @@ declare(strict_types=1);
 
 namespace Synthient\Model;
 
-/**
- * Where an address is located.
- */
 final readonly class Location
 {
     /**

@@ -7,7 +7,7 @@ namespace Synthient\Event;
 use DateTimeImmutable;
 
 /**
- * A proxy sighting from the proxies feed. Every field is null when the API omits it.
+ * Every field is null when the API omits it.
  */
 final readonly class ProxyEvent
 {

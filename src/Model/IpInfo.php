@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Synthient\Model;
 
 /**
- * The result of an IP lookup. A section is null when the API has no data for it.
+ * A section is null when the API has no data for it.
  */
 final readonly class IpInfo
 {

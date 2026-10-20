@@ -4,9 +4,6 @@ declare(strict_types=1);
 
 namespace Synthient\Event;
 
-/**
- * A peer sharing a torrent.
- */
 final readonly class TorrentPeer
 {
     /**

@@ -4,14 +4,11 @@ declare(strict_types=1);
 
 namespace Synthient\Model;
 
-/**
- * The network an address belongs to.
- */
 final readonly class Network
 {
     /**
      * @param int $asn the autonomous system number, or 0 if the address is not routed
-     * @param string $type the kind of network, see NetworkType
+     * @param string $type see NetworkType
      */
     public function __construct(
         public int $asn,

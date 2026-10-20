@@ -8,7 +8,7 @@ use DateTimeImmutable;
 use Synthient\Internal\Wire;
 
 /**
- * A torrent from the torrents feed. Every field is null when the API omits it.
+ * Every field is null when the API omits it.
  */
 final readonly class TorrentEvent
 {

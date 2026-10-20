@@ -7,7 +7,7 @@ namespace Synthient\Event;
 use Synthient\Internal\Wire;
 
 /**
- * A parsed TLS ClientHello. Fields the sensor could not parse are null.
+ * Fields the sensor could not parse are null.
  */
 final readonly class TlsClientHello
 {

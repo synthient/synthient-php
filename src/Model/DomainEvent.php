@@ -7,9 +7,6 @@ namespace Synthient\Model;
 use DateTimeImmutable;
 use Synthient\Internal\Wire;
 
-/**
- * A recent event for a domain.
- */
 final readonly class DomainEvent
 {
     /**

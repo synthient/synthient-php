@@ -4,9 +4,6 @@ declare(strict_types=1);
 
 namespace Synthient\Event;
 
-/**
- * A TLS extension in a ClientHello.
- */
 final readonly class TlsExtension
 {
     /**

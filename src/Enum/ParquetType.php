@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Synthient\Enum;
 
 /**
- * The type of a column in a Parquet export. The API may add values.
+ * The API may add values.
  */
 final class ParquetType
 {

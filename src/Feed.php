@@ -45,8 +45,8 @@ final readonly class Feed
     ) {}
 
     /**
-     * Connects to the feed's real-time stream. Errors such as a missing scope (403) or too
-     * many open streams (429) are thrown here, before iteration.
+     * Connects at once, so errors such as a missing scope (403) or too many open streams (429)
+     * are thrown here, before iteration.
      *
      * @return EventStream<T>
      */

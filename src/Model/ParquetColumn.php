@@ -4,9 +4,6 @@ declare(strict_types=1);
 
 namespace Synthient\Model;
 
-/**
- * A column of a Parquet export.
- */
 final readonly class ParquetColumn
 {
     /**

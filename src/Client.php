@@ -25,8 +25,6 @@ use Synthient\Model\DomainInfo;
 use Synthient\Model\IpInfo;
 
 /**
- * A client for the Synthient API.
- *
  * Create one client and reuse it. Constructing it makes no requests.
  *
  * Account and feed requests are retried on 500, 502, 503, and 504 responses, on transport
@@ -84,7 +82,7 @@ final class Client
     private readonly Transport $transport;
 
     /**
-     * @param string|null $apiKey the API key; defaults to the SYNTHIENT_API_KEY environment variable
+     * @param string|null $apiKey defaults to the SYNTHIENT_API_KEY environment variable
      * @param string $baseUrl the API base URL, including the version path
      * @param int $maxRetries how many times a failed request is retried; 0 disables retries
      * @param float $connectTimeout seconds to wait for a connection. Guzzle's stream handler, which
@@ -171,7 +169,7 @@ final class Client
     }
 
     /**
-     * Checks that the API is up. It costs no credits, and an unhealthy API is reported at once.
+     * It costs no credits, and an unhealthy API is reported at once, without retries.
      *
      * @throws ApiException with status 503 when the API is unhealthy
      */

@@ -31,8 +31,6 @@ use Synthient\RateLimit;
 use Synthient\ResponseMetadata;
 
 /**
- * Sends API requests with authentication, retries, and response checks.
- *
  * @internal
  */
 final class Transport
@@ -82,9 +80,6 @@ final class Transport
     }
 
     /**
-     * Sends a JSON request and decodes a 2xx response into $class, or discards it when
-     * $class is null.
-     *
      * @template T of object
      *
      * @param class-string<T>|null $class
@@ -120,7 +115,7 @@ final class Transport
     }
 
     /**
-     * Connects to an NDJSON stream and returns its unread body. The caller closes it.
+     * The caller closes the returned body.
      */
     public function openStream(string $path): StreamInterface
     {
@@ -133,9 +128,6 @@ final class Transport
         return new Body($response->getBody());
     }
 
-    /**
-     * Asks the API where an export is stored and returns the presigned URL.
-     */
     public function downloadUrl(string $path): string
     {
         $response = $this->send('GET', $path, RetryPolicy::Transient, false);
@@ -152,8 +144,8 @@ final class Transport
     }
 
     /**
-     * Downloads an export from storage without the API key or the client's default headers,
-     * cookies, and auth, following up to ten validated redirects. Errors never include the
+     * The storage request carries neither the API key nor the client's default headers,
+     * cookies, and auth, so no credential reaches the storage host. Errors never include the
      * presigned URL.
      */
     public function openDownload(string $path): StreamInterface
@@ -311,9 +303,8 @@ final class Transport
     }
 
     /**
-     * Returns how long to wait before retrying, or null to stop. The rate limiter always
-     * sends Retry-After, so a 429 without one is final. A Retry-After over a minute is not
-     * waited out, so the caller sees the error and its retryAfter.
+     * The rate limiter always sends Retry-After, so a 429 without one is final. A Retry-After
+     * over a minute is not waited out, so the caller sees the error and its retryAfter.
      */
     private static function retryDelay(RetryPolicy $policy, ResponseInterface $response, int $attempt): ?float
     {
@@ -436,8 +427,7 @@ final class Transport
     }
 
     /**
-     * Resolves and validates a redirect's Location. Errors never include the URL, which is
-     * presigned.
+     * Errors never include the URL, which is presigned.
      */
     private static function redirectTarget(
         #[\SensitiveParameter]

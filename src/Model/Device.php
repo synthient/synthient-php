@@ -6,13 +6,10 @@ namespace Synthient\Model;
 
 use DateTimeImmutable;
 
-/**
- * A device seen behind an address.
- */
 final readonly class Device
 {
     /**
-     * @param string $os the operating system, see OperatingSystem
+     * @param string $os see OperatingSystem
      */
     public function __construct(
         public string $os,

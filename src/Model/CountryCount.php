@@ -4,9 +4,6 @@ declare(strict_types=1);
 
 namespace Synthient\Model;
 
-/**
- * Activity from one country.
- */
 final readonly class CountryCount
 {
     public function __construct(

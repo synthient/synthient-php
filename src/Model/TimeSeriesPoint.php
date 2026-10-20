@@ -6,9 +6,6 @@ namespace Synthient\Model;
 
 use DateTimeImmutable;
 
-/**
- * One day of a domain's activity.
- */
 final readonly class TimeSeriesPoint
 {
     /**

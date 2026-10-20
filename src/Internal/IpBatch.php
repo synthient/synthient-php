@@ -7,8 +7,6 @@ namespace Synthient\Internal;
 use Synthient\Model\IpInfo;
 
 /**
- * The response of a batch IP lookup.
- *
  * @internal
  */
 final readonly class IpBatch

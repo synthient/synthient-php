@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Builds the Composer archive, installs it into a fresh consumer outside the checkout
-# without development dependencies, and runs consumer-test/main.php against it.
+# Checks that the Composer archive installs and runs without the checkout or development
+# dependencies.
 set -euo pipefail
 
 root=$(cd "$(dirname "$0")/.." && pwd)

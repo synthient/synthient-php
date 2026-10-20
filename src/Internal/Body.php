@@ -11,9 +11,6 @@ use Synthient\Exception\ConnectionException;
 use Synthient\Exception\TimeoutException;
 
 /**
- * A response body whose failed reads throw ConnectionException, or TimeoutException when the
- * read timed out.
- *
  * @internal
  */
 final class Body implements StreamInterface
@@ -31,6 +28,7 @@ final class Body implements StreamInterface
                 ? new TimeoutException('synthient: reading the response timed out', 0, $e)
                 : new ConnectionException('synthient: reading the response failed', 0, $e);
         }
+        // guzzlehttp/psr7 2 can return an empty string from a timed-out read instead of throwing.
         if ($chunk === '' && $this->timedOut()) {
             throw new TimeoutException('synthient: reading the response timed out');
         }

@@ -14,8 +14,8 @@ final readonly class ResponseMetadata
     /**
      * @param string|null $requestId the X-Request-Id header, which support can trace
      * @param RateLimit|null $rateLimit null when the response has no complete RateLimit-* headers
-     * @param string[][] $headers the response headers; an export redirect's
-     *                                             Location is a presigned URL, so treat it as a secret
+     * @param string[][] $headers an export redirect's Location is a presigned URL, so treat it
+     *                            as a secret
      */
     public function __construct(
         public int $statusCode,

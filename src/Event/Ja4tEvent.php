@@ -7,7 +7,7 @@ namespace Synthient\Event;
 use DateTimeImmutable;
 
 /**
- * A JA4T TCP fingerprint sighting from the ja4t feed. Every field is null when the API omits it.
+ * Every field is null when the API omits it.
  */
 final readonly class Ja4tEvent
 {

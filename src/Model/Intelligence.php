@@ -6,9 +6,6 @@ namespace Synthient\Model;
 
 use Synthient\Internal\Wire;
 
-/**
- * What Synthient has observed about an address.
- */
 final readonly class Intelligence
 {
     /**

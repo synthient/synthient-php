@@ -238,8 +238,6 @@ final class ConformanceTest extends TestCase
     }
 
     /**
-     * Returns the PHP types that can hold a schema.
-     *
      * @param array<mixed> $definition
      *
      * @return list<string>

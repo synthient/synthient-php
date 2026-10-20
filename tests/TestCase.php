@@ -131,8 +131,6 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
     }
 
     /**
-     * Runs $fn and returns the $class exception it throws. Other exceptions propagate.
-     *
      * @template E of Throwable
      *
      * @param class-string<E> $class
@@ -154,9 +152,6 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
     }
 
     /**
-     * Iterates until the end or the first exception, returning what was yielded and the
-     * exception.
-     *
      * @template T
      *
      * @param iterable<T> $items

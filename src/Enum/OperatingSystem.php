@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Synthient\Enum;
 
 /**
- * The operating system of a device seen behind an address. The API may add values.
+ * The API may add values.
  */
 final class OperatingSystem
 {

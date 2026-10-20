@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Synthient\Enum;
 
 /**
- * The kind of network an address belongs to. The API may add values.
+ * The API may add values.
  */
 final class NetworkType
 {

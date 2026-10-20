@@ -7,9 +7,6 @@ namespace Synthient\Model;
 use DateTimeImmutable;
 use Synthient\Internal\Wire;
 
-/**
- * A proxy or VPN provider seen using an address.
- */
 final readonly class Provider
 {
     public function __construct(

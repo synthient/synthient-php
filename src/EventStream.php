@@ -91,8 +91,7 @@ final class EventStream implements IteratorAggregate
     }
 
     /**
-     * Closes the connection. An iteration in progress then ends without an error, after the
-     * events already received.
+     * An iteration in progress ends without an error, after the events already received.
      */
     public function close(): void
     {

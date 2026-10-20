@@ -6,9 +6,6 @@ namespace Synthient\Model;
 
 use Synthient\Internal\Wire;
 
-/**
- * Distinct source addresses seen for a domain.
- */
 final readonly class UniqueIps
 {
     /**
