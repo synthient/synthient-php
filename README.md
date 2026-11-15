@@ -23,28 +23,25 @@
 ## Table of Contents
 
 - [synthient-php](#synthient-php)
-  - [SDK Installation](#sdk-installation)
-  - [Requirements](#requirements)
-  - [API Keys](#api-keys)
+  - [Installation](#installation)
+  - [Quick Start](#quick-start)
   - [Authentication](#authentication)
-  - [SDK Example Usage](#sdk-example-usage)
   - [Available Resources and Operations](#available-resources-and-operations)
-  - [Streaming](#streaming)
-  - [Pagination](#pagination)
-  - [Downloads](#downloads)
-  - [Retries](#retries)
-  - [Timeouts](#timeouts)
-  - [Error Handling](#error-handling)
-  - [Server Selection](#server-selection)
-  - [Custom HTTP Client](#custom-http-client)
-  - [Debugging](#debugging)
+  - [IP and Domain Lookups](#ip-and-domain-lookups)
+  - [Account](#account)
+  - [Feeds](#feeds)
+  - [Errors](#errors)
+  - [Retries and Timeouts](#retries-and-timeouts)
+  - [Configuration](#configuration)
+  - [Response Metadata](#response-metadata)
   - [gRPC Schema](#grpc-schema)
-- [Development](#development)
-  - [Maturity](#maturity)
+  - [Requirements](#requirements)
+  - [Versioning](#versioning)
+  - [Documentation](#documentation)
   - [Contributions](#contributions)
   - [License](#license)
 
-## SDK Installation
+## Installation
 
 ```sh
 composer require synthient/synthient-php
@@ -52,21 +49,24 @@ composer require synthient/synthient-php
 
 Composer also installs [Guzzle](https://docs.guzzlephp.org), which the SDK uses to send requests.
 
-## Requirements
+## Quick Start
 
-PHP 8.3 or later on a 64-bit build, with Guzzle 7.15.2 or later or 8.0.1 or later. With the default HTTP client, streams and downloads go through Guzzle's PHP stream handler, which needs the `allow_url_fopen` ini setting. It is on by default.
+Look up an IP address and print its risk score and categories. The lookup costs one credit.
 
-## API Keys
+```php
+<?php
 
-Every request needs a Synthient API key. Keys are issued from the Synthient dashboard; if you don't have one, [contact us](mailto:contact@synthient.com). A key's scopes decide what it can call: `BASIC` covers the lookups and `account()`, and each feed has its own scopes, listed under [Feeds](#feeds).
+require __DIR__ . '/vendor/autoload.php';
 
-If a request fails even though you are sending a key:
+$client = new Synthient\Client();
 
-- **401 Unauthorized**: the key is malformed, unknown, or revoked.
-- **402 Payment Required**: the team is out of lookup credits.
-- **403 Forbidden**: the key lacks the scope for that endpoint or feed.
+$info = $client->lookupIp('8.8.8.8');
+if ($info->intelligence !== null) {
+    echo $info->intelligence->riskScore, ' ', implode(', ', $info->intelligence->categories), "\n";
+}
+```
 
-`account()` shows the key's scopes and the team's remaining credits.
+With no arguments, the client reads the API key from the `SYNTHIENT_API_KEY` environment variable. The examples below reuse `$client`, and runnable programs are in [examples](https://github.com/synthient/synthient-php/tree/main/examples).
 
 ## Authentication
 
@@ -86,26 +86,65 @@ $client = new Synthient\Client(apiKey: $apiKey);
 
 The constructor makes no network calls. To check a key, call `account()`, which costs no credits.
 
-## SDK Example Usage
+See [Authentication](https://docs.synthient.com/authentication) in the API documentation.
+
+### API Keys
+
+Every request needs a Synthient API key. Keys are issued from the Synthient dashboard; if you don't have one, [contact us](mailto:contact@synthient.com). A key's scopes decide what it can call: `BASIC` covers the lookups and `account()`, and each feed has its own scopes, listed under [Feeds](#feeds).
+
+If a request fails even though you are sending a key:
+
+- **401 Unauthorized**: the key is malformed, unknown, or revoked.
+- **402 Payment Required**: the team is out of lookup credits.
+- **403 Forbidden**: the key lacks the scope for that endpoint or feed.
+
+`account()` shows the key's scopes and the team's remaining credits.
+
+## Available Resources and Operations
+
+<details open>
+<summary>Available methods</summary>
+
+### Client
+
+- [`lookupIp`](#look-up-an-ip-address) - Look up an IPv4 or IPv6 address
+- [`lookupIps`](#look-up-many-ip-addresses) - Look up as many as 1000 addresses in one request
+- [`lookupDomain`](#look-up-a-domain) - Look up the honeypot traffic observed for a domain
+- [`account`](#account) - Get the key's account, scopes, and remaining lookup credits
+- [`health`](#check-the-apis-health) - Check that the API and its dependencies are healthy
+
+### Feed
+
+Each [feed](#feeds) is a property of the client, such as `$client->proxies`, and has the same methods:
+
+- [`stream`](#streaming) - Connect to the feed's real-time events
+- [`listExports`](#pagination) - List one page of the feed's Parquet exports, newest first
+- [`allExports`](#pagination) - Iterate over every export, fetching pages as needed
+- [`exportMeta`](#downloads) - Get an export's checksum, size, row count, and Parquet schema
+- [`download`](#downloads) - Open an export's Parquet file for reading
+- [`downloadUrl`](#downloads) - Get a presigned URL for an export's Parquet file, valid for 24 hours
+
+</details>
+
+## IP and Domain Lookups
+
+The lookups need the `BASIC` scope. See [Lookups](https://docs.synthient.com/sdks/php/lookups) in the SDK documentation and the [IP API](https://docs.synthient.com/ipapi) reference.
 
 ### Look up an IP address
 
 Get the network, location, and risk intelligence for an IPv4 or IPv6 address. Each lookup costs one credit; failed lookups are free.
 
 ```php
-<?php
-
-require __DIR__ . '/vendor/autoload.php';
-
-$client = new Synthient\Client();
-
 $info = $client->lookupIp('8.8.8.8');
-if ($info->intelligence !== null) {
-    echo $info->intelligence->riskScore, ' ', implode(', ', $info->intelligence->categories), "\n";
+if ($info->network !== null) {
+    echo $info->network->isp, ' ', $info->network->type, "\n";
+}
+if ($info->location !== null) {
+    echo $info->location->city, ', ', $info->location->country, "\n";
 }
 ```
 
-`network`, `location`, and `intelligence` are null when the API has no data for them. The examples below reuse `$client`, and runnable programs are in [examples](https://github.com/synthient/synthient-php/tree/main/examples).
+`network`, `location`, and `intelligence` are null when the API has no data for them. A private or reserved address is rejected with a 422 `ApiException`.
 
 ### Look up many IP addresses
 
@@ -119,9 +158,11 @@ foreach ($client->lookupIps(['8.8.8.8', '1.1.1.1']) as $result) {
 }
 ```
 
+An empty list returns `[]` without a request, and more than `Synthient\Client::MAX_BATCH_SIZE` addresses throw `InvalidArgumentException`. Nothing is billed when the team cannot cover the whole batch.
+
 ### Look up a domain
 
-Get the honeypot traffic observed for a domain and its most recent events. Each lookup costs one credit.
+Get the honeypot traffic observed for a domain over the last 30 days and its most recent events. Each lookup costs one credit.
 
 ```php
 $domain = $client->lookupDomain('example.com', limit: 10);
@@ -131,7 +172,11 @@ foreach ($domain->recentEvents as $event) {
 }
 ```
 
-### Check your account
+- `limit` is how many recent events to return. The API defaults to 50 and clamps values above 1000.
+- Send internationalized names as Punycode.
+- A domain that was never observed is `inactive` with zeroed stats, not an error.
+
+## Account
 
 Get the key's account, scopes, and remaining lookup credits, at no cost.
 
@@ -140,29 +185,25 @@ $account = $client->account();
 echo $account->organization->name, ' ', implode(', ', $account->scopes), ' ', $account->lookupQuota->credits, "\n";
 ```
 
-## Available Resources and Operations
+`$account->lookupQuota->resetsIn` is the number of seconds until the credits reset.
 
-<details open>
-<summary>Available methods</summary>
+### Check the API's health
 
-### Client
+`health()` returns nothing when the API is healthy and throws an `ApiException` with status 503 when it is not. It costs no credits.
 
-- `lookupIp` - Look up an IPv4 or IPv6 address
-- `lookupIps` - Look up as many as 1000 addresses in one request
-- `lookupDomain` - Look up the honeypot traffic observed for a domain
-- `account` - Get the key's account, scopes, and remaining lookup credits
-- `health` - Check that the API and its dependencies are healthy
+```php
+use Synthient\Exception\ApiException;
 
-### Feeds
+try {
+    $client->health();
+} catch (ApiException $e) {
+    echo 'unhealthy: ', $e->getMessage(), "\n";
+}
+```
 
-Each feed is a property of the client, such as `$client->proxies`, and has the same methods:
+## Feeds
 
-- `stream` - Connect to the feed's real-time events
-- `listExports` - List one page of the feed's Parquet exports, newest first
-- `allExports` - Iterate over every export, fetching pages as needed
-- `exportMeta` - Get an export's checksum, size, row count, and Parquet schema
-- `download` - Open an export's Parquet file for reading
-- `downloadUrl` - Get a presigned URL for an export's Parquet file, valid for 24 hours
+Each feed is a property of the client, such as `$client->proxies`, with a real-time stream and hourly and daily Parquet exports. Streaming and exports need separate scopes:
 
 | Property      | Data                                          | Event class        | Stream scope            | Export scope          |
 | ------------- | --------------------------------------------- | ------------------ | ----------------------- | --------------------- |
@@ -177,9 +218,9 @@ Each feed is a property of the client, such as `$client->proxies`, and has the s
 
 The event classes are in the `Synthient\Event` namespace, and the scope names are constants of `Synthient\Enum\Scope`.
 
-</details>
+See [Feeds](https://docs.synthient.com/sdks/php/feeds) in the SDK documentation, and [Firehose](https://docs.synthient.com/enterprise/firehose) and [Feeds](https://docs.synthient.com/enterprise/feeds) for the data behind each feed.
 
-## Streaming
+### Streaming
 
 `stream()` connects to a feed's real-time events and returns an `EventStream` to iterate once. Close it in a `finally` block to release the connection:
 
@@ -213,7 +254,7 @@ while (true) {
 - Any other failure throws a `SynthientException`, and the loop waits 2 seconds before reconnecting.
 - Events sent while disconnected are missed. The API has no resume cursor.
 
-## Pagination
+### Pagination
 
 `listExports()` returns one page of a feed's exports, newest first. Pass `$page->nextCursor` as `cursor` to get the next page; it is null or empty on the last one.
 
@@ -234,7 +275,9 @@ foreach ($client->proxies->allExports() as $export) {
 
 On the first page, the newest hourly export has the ID `'latest'`, a moving alias for the freshest export. Its `date` and `hour` give its stable ID, such as `'2026-10-14/21'`.
 
-## Downloads
+`limit` sets the page size for both methods. The API defaults to 100 and clamps values above 500.
+
+### Downloads
 
 Exports are Parquet files. `download()` returns a file's contents as a PSR-7 stream, which you must close:
 
@@ -260,40 +303,12 @@ if (!hash_equals($client->proxies->exportMeta($id)->checksum, hash_final($hash))
 }
 ```
 
-- Name an export by its `id` from a listing, by `'latest'`, by a UTC day or hour as `'YYYY-MM-DD'` or `'YYYY-MM-DD/H'`, or by a `DateTimeInterface` for its UTC day.
+- Name an export by its `id` from a listing, by `'latest'`, by a UTC day or hour as `'YYYY-MM-DD'` or `'YYYY-MM-DD/H'`, or by a `DateTimeInterface` for its UTC day. Build an hourly ID with `format('Y-m-d/G')` on a time in UTC.
 - A connection that closes early can end a download without an error, so compare the file's SHA-256 with `exportMeta()`'s `checksum`, as above. Use a fixed ID for both calls, because `'latest'` can move between them.
 - `downloadUrl()` returns a presigned URL that works without a key for 24 hours, so treat it as a secret. Your API key is never sent to the storage host.
 - Hourly exports roll into the daily export shortly after 00:30 UTC the next day. After that, the hour returns a 400.
 
-## Retries
-
-The client retries a failed request up to twice, backing off exponentially with jitter and honoring `Retry-After`:
-
-| Requests                      | Retried on                                                                                   |
-| ----------------------------- | -------------------------------------------------------------------------------------------- |
-| Account and feed requests     | 500, 502, 503, and 504, most transport errors, and 429 with `Retry-After`                    |
-| Billed lookups and `health()` | Only 429 with `Retry-After`, which comes before any work, so a lookup is never charged twice |
-
-A 429 without `Retry-After` means the monthly request budget is spent or too many streams are open, so it is thrown at once. Downloads from the storage host are never retried.
-
-Set the number of retries with `maxRetries`. Zero disables them:
-
-```php
-$client = new Synthient\Client(maxRetries: 4);
-```
-
-## Timeouts
-
-The client waits up to 10 seconds (`connectTimeout`) to connect and up to 60 seconds (`timeout`) for each attempt's response. Both are in seconds:
-
-```php
-$client = new Synthient\Client(connectTimeout: 5.0, timeout: 30.0);
-```
-
-- On a stream or download, `timeout` bounds each wait for the next data, not the whole transfer. The API sends a stream keepalive about every 15 seconds.
-- Guzzle's PHP stream handler, which serves streams, downloads, and every request without the cURL extension, ignores `connectTimeout` and waits up to `timeout` to connect.
-
-## Error Handling
+## Errors
 
 A request that fails with a non-success status throws a `Synthient\Exception\ApiException`:
 
@@ -359,9 +374,61 @@ Invalid arguments, such as a missing API key or a malformed IP address, throw `I
 
 </details>
 
-## Server Selection
+See [Errors and retries](https://docs.synthient.com/sdks/php/errors) in the SDK documentation and [Errors](https://docs.synthient.com/errors) for what each status means.
 
-### Override Server URL Per-Client
+## Retries and Timeouts
+
+### Retries
+
+The client retries a failed request up to twice, backing off exponentially with jitter and honoring `Retry-After`:
+
+| Requests                      | Retried on                                                                                   |
+| ----------------------------- | -------------------------------------------------------------------------------------------- |
+| Account and feed requests     | 500, 502, 503, and 504, most transport errors, and 429 with `Retry-After`                    |
+| Billed lookups and `health()` | Only 429 with `Retry-After`, which comes before any work, so a lookup is never charged twice |
+
+The first retry waits about one second, and the wait doubles up to 30 seconds. A `Retry-After` longer than a minute is not waited for: the `ApiException` is thrown with its `retryAfter` instead. TLS failures are not retried.
+
+A 429 without `Retry-After` means the monthly request budget is spent or too many streams are open, so it is thrown at once. Downloads from the storage host are never retried.
+
+Set the number of retries with `maxRetries`. Zero disables them:
+
+```php
+$client = new Synthient\Client(maxRetries: 4);
+```
+
+### Timeouts
+
+The client waits up to 10 seconds (`connectTimeout`) to connect and up to 60 seconds (`timeout`) for each attempt's response. Both are in seconds:
+
+```php
+$client = new Synthient\Client(connectTimeout: 5.0, timeout: 30.0);
+```
+
+- On a stream or download, `timeout` bounds each wait for the next data, not the whole transfer. The API sends a stream keepalive about every 15 seconds.
+- Guzzle's PHP stream handler, which serves streams, downloads, and every request without the cURL extension, ignores `connectTimeout` and waits up to `timeout` to connect.
+- Retries get a fresh timeout, so a call with retries can take longer than `timeout`.
+
+See [Rate Limits](https://docs.synthient.com/rate-limits) for the limits behind a 429.
+
+## Configuration
+
+Every constructor argument is optional, so pass the ones you need by name:
+
+| Option           | Type                               | Default                            | Description                                                 |
+| ---------------- | ---------------------------------- | ---------------------------------- | ----------------------------------------------------------- |
+| `apiKey`         | `?string`                          | `SYNTHIENT_API_KEY`                | The API key                                                 |
+| `baseUrl`        | `string`                           | `https://api.synthient.com/api/v4` | The API base URL, including the version path                |
+| `maxRetries`     | `int`                              | `2`                                | How many times a failed request is retried                  |
+| `connectTimeout` | `float`                            | `10.0`                             | Seconds to wait for a connection                            |
+| `timeout`        | `float`                            | `60.0`                             | Seconds each attempt waits for a response, or the next data |
+| `httpClient`     | `?GuzzleHttp\ClientInterface`      | Guzzle's default client            | A Guzzle client, for proxies, TLS settings, or a handler    |
+| `userAgent`      | `?string`                          | none                               | Appended to the `User-Agent` header                         |
+| `responseHook`   | `?Closure(ResponseMetadata): void` | none                               | Called with every API response                              |
+
+An invalid option throws `InvalidArgumentException`. See [Client](https://docs.synthient.com/sdks/php/client) in the SDK documentation.
+
+### Server URL
 
 The default server is `https://api.synthient.com/api/v4`. Use `baseUrl` to send requests elsewhere, such as a mock server in tests:
 
@@ -369,7 +436,7 @@ The default server is `https://api.synthient.com/api/v4`. Use `baseUrl` to send 
 $client = new Synthient\Client(baseUrl: 'http://localhost:8080/api/v4');
 ```
 
-## Custom HTTP Client
+### Custom HTTP Client
 
 Pass your own `GuzzleHttp\ClientInterface` as `httpClient`, for example to use a proxy:
 
@@ -386,7 +453,7 @@ $client = new Synthient\Client(
 
 `userAgent: 'my-app/1.2'` adds your product token to the `User-Agent` header.
 
-## Debugging
+## Response Metadata
 
 `responseHook` is called after every API response, including retries, pages, stream handshakes, and export redirects, with a `Synthient\ResponseMetadata` holding the status, request ID, rate limit, and headers:
 
@@ -398,6 +465,15 @@ $client = new Synthient\Client(responseHook: function (Synthient\ResponseMetadat
     }
 });
 ```
+
+| Property     | Type                   | Description                                                               |
+| ------------ | ---------------------- | ------------------------------------------------------------------------- |
+| `statusCode` | `int`                  | HTTP status code of the response                                          |
+| `requestId`  | `?string`              | The `X-Request-Id` header, which support can trace                        |
+| `rateLimit`  | `?Synthient\RateLimit` | `limit`, `remaining`, and `reset` from the `RateLimit-*` headers, or null |
+| `headers`    | `string[][]`           | The response headers                                                      |
+
+`reset` is the number of seconds until the rate limit bucket is full again. Limits apply per team and are shared by all of its keys; see [Rate Limits](https://docs.synthient.com/rate-limits). The storage host's responses to export downloads don't reach the hook.
 
 An exception the hook throws reaches your code.
 
@@ -414,11 +490,22 @@ grpcurl -H "x-api-key: $SYNTHIENT_API_KEY" -protoset-out synthient.protoset grpc
 
 `-protoset-out` writes the service and every message it uses to `synthient.protoset` as a `FileDescriptorSet`.
 
-# Development
+## Requirements
 
-## Maturity
+PHP 8.3 or later on a 64-bit build, with Guzzle 7.15.2 or later or 8.0.1 or later. With the default HTTP client, streams and downloads go through Guzzle's PHP stream handler, which needs the `allow_url_fopen` ini setting. It is on by default.
+
+## Versioning
 
 This SDK follows [Semantic Versioning](https://semver.org). Breaking changes ship only in a new major version, so the `^1.0` constraint that `composer require` adds accepts every compatible release.
+
+## Documentation
+
+- [PHP SDK](https://docs.synthient.com/sdks/php): getting started
+- [Client](https://docs.synthient.com/sdks/php/client): the constructor, its options, and response metadata
+- [Lookups](https://docs.synthient.com/sdks/php/lookups): IP and domain lookups, the account, and the API's health
+- [Feeds](https://docs.synthient.com/sdks/php/feeds): streams and Parquet exports
+- [Errors and retries](https://docs.synthient.com/sdks/php/errors): exceptions, retries, and timeouts
+- [Types](https://docs.synthient.com/sdks/php/types): the fields of every response and event class
 
 ## Contributions
 
