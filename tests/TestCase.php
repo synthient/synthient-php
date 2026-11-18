@@ -15,6 +15,7 @@ use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
 use ReflectionProperty;
 use Synthient\Client;
+use Synthient\Dataset;
 use Synthient\Feed;
 use Synthient\Internal\Transport;
 use Throwable;
@@ -70,11 +71,19 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
             'anonymizers' => $client->anonymizers,
             'torrents' => $client->torrents,
             'ja4t' => $client->ja4t,
-            'helio/http' => $client->heliosHttp,
-            'helio/https' => $client->heliosHttps,
-            'helio/dns' => $client->heliosDns,
-            'helio/adb' => $client->heliosAdb,
+            'helios/http' => $client->heliosHttp,
+            'helios/https' => $client->heliosHttps,
+            'helios/dns' => $client->heliosDns,
+            'helios/adb' => $client->heliosAdb,
         ];
+    }
+
+    /**
+     * @return array<string, Dataset> each dataset by its path under /feeds
+     */
+    protected static function datasets(Client $client): array
+    {
+        return ['geolocation' => $client->geolocation, 'whois' => $client->whois];
     }
 
     /**

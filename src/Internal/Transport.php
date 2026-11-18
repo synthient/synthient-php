@@ -128,15 +128,20 @@ final class Transport
         return new Body($response->getBody());
     }
 
-    public function downloadUrl(string $path): string
+    /**
+     * @param array<string, string> $query
+     */
+    public function downloadUrl(string $path, array $query = []): string
     {
-        $response = $this->send('GET', $path, RetryPolicy::Transient, false);
+        $response = $this->send('GET', $path, RetryPolicy::Transient, false, $query);
         $status = $response->getStatusCode();
         if ($status >= 400) {
             throw $this->apiError($response);
         }
         $response->getBody()->close();
-        if ($status < 300) {
+        // The SDK never sends a conditional request, so a 304 can only come from a caller's
+        // middleware, and it carries no location to follow.
+        if ($status < 300 || $status === 304) {
             throw new SynthientException("synthient: expected a redirect to the export, got status {$status}");
         }
 
@@ -147,11 +152,13 @@ final class Transport
      * The storage request carries neither the API key nor the client's default headers,
      * cookies, and auth, so no credential reaches the storage host. Errors never include the
      * presigned URL.
+     *
+     * @param array<string, string> $query
      */
-    public function openDownload(string $path): StreamInterface
+    public function openDownload(string $path, array $query = []): StreamInterface
     {
         $this->requireStreaming();
-        $url = $this->downloadUrl($path);
+        $url = $this->downloadUrl($path, $query);
         for ($hop = 0; ; $hop++) {
             $start = hrtime(true);
             try {

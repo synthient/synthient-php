@@ -18,6 +18,7 @@ final readonly class HeliosHttpsEvent
      * @param int $port the destination port
      * @param TlsClientHello|null $details null when the sensor could not parse the handshake
      * @param string|null $raw always null, because the sensors do not capture handshake bytes
+     * @param string $transport the tunnel transport the event arrived over, see HeliosTransport
      */
     public function __construct(
         public DateTimeImmutable $timestamp,
@@ -29,5 +30,6 @@ final readonly class HeliosHttpsEvent
         public HeliosMeta $meta,
         public ?TlsClientHello $details = null,
         public ?string $raw = null,
+        public string $transport = '',
     ) {}
 }

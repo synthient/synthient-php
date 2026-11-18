@@ -79,6 +79,12 @@ final class Client
     /** @var Feed<HeliosAdbEvent> Android Debug Bridge commands captured by Helios honeypots */
     public readonly Feed $heliosAdb;
 
+    /** @var Dataset IP geolocation, as Parquet, gzip-compressed CSV, or MaxMind DB files */
+    public readonly Dataset $geolocation;
+
+    /** @var Dataset WHOIS registry data, as a tar.gz of Parquet files */
+    public readonly Dataset $whois;
+
     private readonly Transport $transport;
 
     /**
@@ -154,10 +160,12 @@ final class Client
         $this->anonymizers = new Feed($this->transport, '/feeds/anonymizers', AnonymizerEvent::class);
         $this->torrents = new Feed($this->transport, '/feeds/torrents', TorrentEvent::class);
         $this->ja4t = new Feed($this->transport, '/feeds/ja4t', Ja4tEvent::class);
-        $this->heliosHttp = new Feed($this->transport, '/feeds/helio/http', HeliosHttpEvent::class);
-        $this->heliosHttps = new Feed($this->transport, '/feeds/helio/https', HeliosHttpsEvent::class);
-        $this->heliosDns = new Feed($this->transport, '/feeds/helio/dns', HeliosDnsEvent::class);
-        $this->heliosAdb = new Feed($this->transport, '/feeds/helio/adb', HeliosAdbEvent::class);
+        $this->heliosHttp = new Feed($this->transport, '/feeds/helios/http', HeliosHttpEvent::class);
+        $this->heliosHttps = new Feed($this->transport, '/feeds/helios/https', HeliosHttpsEvent::class);
+        $this->heliosDns = new Feed($this->transport, '/feeds/helios/dns', HeliosDnsEvent::class);
+        $this->heliosAdb = new Feed($this->transport, '/feeds/helios/adb', HeliosAdbEvent::class);
+        $this->geolocation = new Dataset($this->transport, '/feeds/geolocation');
+        $this->whois = new Dataset($this->transport, '/feeds/whois');
     }
 
     /**
@@ -190,7 +198,9 @@ final class Client
     }
 
     /**
-     * Looks up as many as 1,000 addresses in one request.
+     * Looks up as many as 1,000 addresses in one request. The API caps a batch by the
+     * workspace plan, at 100 on Free, 500 on Starter, and 1,000 on Premium and Enterprise, and
+     * rejects a larger one with a 422 ApiException.
      *
      * The API skips private and reserved addresses and collapses duplicates, so there can be
      * fewer results than addresses. Match results to inputs by their canonical ip, not by
@@ -223,6 +233,9 @@ final class Client
     /**
      * Looks up the proxy traffic Synthient has observed for a domain over the last 30 days.
      * It costs one credit. Send internationalized names as Punycode.
+     *
+     * @deprecated Domain lookup was removed from the Synthient API and will stop working when
+     *             the endpoint is turned off. It will be removed in the next major version.
      *
      * @param int|null $limit how many recent events to return, at least 1; the API defaults to 50
      *                        and clamps values above 1,000. The top lists are not capped

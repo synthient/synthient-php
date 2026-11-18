@@ -13,7 +13,7 @@
 
 # synthient-php
 
-`synthient-php` is the official PHP SDK for the [Synthient API](https://docs.synthient.com): IP and domain intelligence, account details, and real-time and bulk data feeds.
+`synthient-php` is the official PHP SDK for the [Synthient API](https://docs.synthient.com): IP intelligence, account details, and real-time and bulk data feeds.
 
 [![Packagist](https://img.shields.io/packagist/v/synthient/synthient-php)](https://packagist.org/packages/synthient/synthient-php)
 [![test](https://github.com/synthient/synthient-php/actions/workflows/test.yml/badge.svg)](https://github.com/synthient/synthient-php/actions/workflows/test.yml)
@@ -58,7 +58,7 @@ PHP 8.3 or later on a 64-bit build, with Guzzle 7.15.2 or later or 8.0.1 or late
 
 ## API Keys
 
-Every request needs a Synthient API key. Keys are issued from the Synthient dashboard; if you don't have one, [contact us](mailto:contact@synthient.com). A key's scopes decide what it can call: `BASIC` covers the lookups and `account()`, and each feed has its own scopes, listed under [Feeds](#feeds).
+Every request needs a Synthient API key. Keys are issued from the Synthient dashboard; if you don't have one, [contact us](mailto:contact@synthient.com). A key's scopes decide what it can call: `BASIC` covers the lookups and `account()`, and each feed and dataset has its own scopes, listed under [Feeds](#feeds) and [Datasets](#datasets).
 
 If a request fails even though you are sending a key:
 
@@ -109,25 +109,13 @@ if ($info->intelligence !== null) {
 
 ### Look up many IP addresses
 
-Look up as many as 1000 addresses in one request for `ceil(n * 0.9)` credits. Private and reserved addresses are skipped and duplicates are merged, so match results by their canonical `ip`, such as `2001:4860:4860::8888`.
+Look up a batch of addresses in one request for `ceil(n * 0.9)` credits. The batch cap depends on your plan: 100 on Free, 500 on Starter, and 1000 on Premium and Enterprise, and the API rejects a larger batch with a 422. Private and reserved addresses are skipped and duplicates are merged, so match results by their canonical `ip`, such as `2001:4860:4860::8888`.
 
 ```php
 foreach ($client->lookupIps(['8.8.8.8', '1.1.1.1']) as $result) {
     if ($result->intelligence !== null) {
         echo $result->ip, ' ', $result->intelligence->riskScore, "\n";
     }
-}
-```
-
-### Look up a domain
-
-Get the honeypot traffic observed for a domain and its most recent events. Each lookup costs one credit.
-
-```php
-$domain = $client->lookupDomain('example.com', limit: 10);
-echo $domain->status, ' ', $domain->stats->events24h, "\n";
-foreach ($domain->recentEvents as $event) {
-    echo $event->timestamp->format(DATE_ATOM), ' ', $event->targetSubdomain, ' ', $event->port, "\n";
 }
 ```
 
@@ -148,8 +136,7 @@ echo $account->organization->name, ' ', implode(', ', $account->scopes), ' ', $a
 ### Client
 
 - `lookupIp` - Look up an IPv4 or IPv6 address
-- `lookupIps` - Look up as many as 1000 addresses in one request
-- `lookupDomain` - Look up the honeypot traffic observed for a domain
+- `lookupIps` - Look up a batch of addresses in one request
 - `account` - Get the key's account, scopes, and remaining lookup credits
 - `health` - Check that the API and its dependencies are healthy
 
@@ -160,6 +147,7 @@ Each feed is a property of the client, such as `$client->proxies`, and has the s
 - `stream` - Connect to the feed's real-time events
 - `listExports` - List one page of the feed's Parquet exports, newest first
 - `allExports` - Iterate over every export, fetching pages as needed
+- `exportVolume` - Get the rows and bytes the feed exported per UTC day
 - `exportMeta` - Get an export's checksum, size, row count, and Parquet schema
 - `download` - Open an export's Parquet file for reading
 - `downloadUrl` - Get a presigned URL for an export's Parquet file, valid for 24 hours
@@ -169,13 +157,28 @@ Each feed is a property of the client, such as `$client->proxies`, and has the s
 | `proxies`     | Residential, mobile, and datacenter proxies   | `ProxyEvent`       | `PROXY_FIREHOSE`        | `PROXY_FEEDS`         |
 | `anonymizers` | VPN and anonymizer IP ranges                  | `AnonymizerEvent`  | `ANONYMIZERS_STREAM`    | `ANONYMIZERS_FEED`    |
 | `torrents`    | BitTorrent DHT and tracker peers              | `TorrentEvent`     | `TORRENTS_STREAM`       | `TORRENTS_FEED`       |
-| `ja4t`        | JA4T TCP fingerprints                         | `Ja4tEvent`        | `JA4T_STREAM`           | `JA4T_FEED`           |
 | `heliosHttp`  | Helios honeypot HTTP requests                 | `HeliosHttpEvent`  | `HONEYPOT_HTTP_STREAM`  | `HONEYPOT_HTTP_FEED`  |
 | `heliosHttps` | Helios honeypot TLS ClientHellos              | `HeliosHttpsEvent` | `HONEYPOT_HTTPS_STREAM` | `HONEYPOT_HTTPS_FEED` |
 | `heliosDns`   | Helios honeypot tunnel destinations           | `HeliosDnsEvent`   | `HONEYPOT_DNS_STREAM`   | `HONEYPOT_DNS_FEED`   |
 | `heliosAdb`   | Helios honeypot Android Debug Bridge commands | `HeliosAdbEvent`   | `HONEYPOT_ADB_STREAM`   | `HONEYPOT_ADB_FEED`   |
 
 The event classes are in the `Synthient\Event` namespace, and the scope names are constants of `Synthient\Enum\Scope`.
+
+### Datasets
+
+Datasets have one export per UTC day and no stream. Each dataset is a property of the client, such as `$client->geolocation`, and has the same methods:
+
+- `listExports` - List one page of the dataset's daily exports, newest first
+- `allExports` - Iterate over every export, fetching pages as needed
+- `exportVolume` - Get the rows and bytes the dataset exported per UTC day
+- `exportMeta` - Get a file's checksum, size, and row count, and list every file of the day
+- `download` - Open a day's file in the format you choose for reading
+- `downloadUrl` - Get a presigned URL for a day's file, valid for 24 hours
+
+| Property      | Data                                    | Scope              | Formats                                   |
+| ------------- | --------------------------------------- | ------------------ | ----------------------------------------- |
+| `geolocation` | IP geolocation, network, and risk data  | `GEOLOCATION_FEED` | `parquet` (default), `csv` (gzip), `mmdb` |
+| `whois`       | WHOIS registry records as Parquet files | `WHOIS_FEED`       | `tar.gz`                                  |
 
 </details>
 
@@ -208,7 +211,7 @@ while (true) {
 }
 ```
 
-- The server closes each stream after up to 30 minutes. That ends the inner loop without an error, and the outer loop reconnects at once.
+- The server can close a stream at any time, such as during a deploy. That ends the inner loop without an error, and the outer loop reconnects at once.
 - A 401 or 403 stops the loop, because reconnecting can't fix a rejected key or a missing scope.
 - Any other failure throws a `SynthientException`, and the loop waits 2 seconds before reconnecting.
 - Events sent while disconnected are missed. The API has no resume cursor.
@@ -232,11 +235,19 @@ foreach ($client->proxies->allExports() as $export) {
 }
 ```
 
+Pass `day`, a `'YYYY-MM-DD'` string or a `DateTimeInterface`, to list only one UTC day's exports:
+
+```php
+foreach ($client->proxies->allExports(day: '2026-10-14') as $export) {
+    echo $export->id, ' ', $export->rowCount, "\n";
+}
+```
+
 On the first page, the newest hourly export has the ID `'latest'`, a moving alias for the freshest export. Its `date` and `hour` give its stable ID, such as `'2026-10-14/21'`.
 
 ## Downloads
 
-Exports are Parquet files. `download()` returns a file's contents as a PSR-7 stream, which you must close:
+Feed exports are Parquet files. `download()` returns a file's contents as a PSR-7 stream, which you must close:
 
 ```php
 $id = (new DateTimeImmutable('yesterday', new DateTimeZone('UTC')))->format('Y-m-d');
@@ -260,10 +271,32 @@ if (!hash_equals($client->proxies->exportMeta($id)->checksum, hash_final($hash))
 }
 ```
 
-- Name an export by its `id` from a listing, by `'latest'`, by a UTC day or hour as `'YYYY-MM-DD'` or `'YYYY-MM-DD/H'`, or by a `DateTimeInterface` for its UTC day.
+Datasets offer more formats. This downloads the newest geolocation database as a MaxMind DB:
+
+```php
+use Synthient\Enum\ExportFormat;
+
+$body = $client->geolocation->download('latest', format: ExportFormat::MMDB);
+$file = fopen('geolocation.mmdb', 'wb') ?: throw new RuntimeException('cannot open geolocation.mmdb');
+try {
+    while (!$body->eof()) {
+        $chunk = $body->read(1 << 20);
+        if (fwrite($file, $chunk) !== strlen($chunk)) {
+            throw new RuntimeException('cannot write geolocation.mmdb');
+        }
+    }
+} finally {
+    $body->close();
+    fclose($file);
+}
+```
+
+- Name an export by its `id` from a listing, by `'latest'`, by a UTC day or hour as `'YYYY-MM-DD'` or `'YYYY-MM-DD/H'`, or by a `DateTimeInterface` for its UTC day. Datasets have no hourly exports.
 - A connection that closes early can end a download without an error, so compare the file's SHA-256 with `exportMeta()`'s `checksum`, as above. Use a fixed ID for both calls, because `'latest'` can move between them.
 - `downloadUrl()` returns a presigned URL that works without a key for 24 hours, so treat it as a secret. Your API key is never sent to the storage host.
 - Hourly exports roll into the daily export shortly after 00:30 UTC the next day. After that, the hour returns a 400.
+- `proxies` and `anonymizers` also publish lite exports, deduplicated to the latest row per address or range and provider. Pass `variant: ExportVariant::LITE` to `listExports()` to list them. A lite export has the same ID as the full one, so pass `variant` again to `exportMeta()`, `downloadUrl()`, and `download()`.
+- Files come back exactly as served: a `csv` download is a `.csv.gz` file, and a WHOIS download is a `.tar.gz` archive of Parquet files.
 
 ## Retries
 
@@ -353,7 +386,7 @@ Invalid arguments, such as a missing API key or a malformed IP address, throw `I
 | 402    | The team is out of lookup credits                                                               |
 | 403    | The key lacks the scope for the endpoint or feed                                                |
 | 404    | The export doesn't exist, or a daily export is still rolling up (`retryAfter` is set)           |
-| 422    | The input is invalid, such as a private address or a malformed domain                           |
+| 422    | The input is invalid, such as a private address                                                 |
 | 429    | Rate limited if `retryAfter` is set; otherwise the budget is spent or too many streams are open |
 | 5xx    | The server failed                                                                               |
 

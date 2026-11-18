@@ -12,8 +12,6 @@ use GuzzleHttp\Promise\PromiseInterface;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Psr\Http\Message\RequestInterface;
-use Synthient\Enum\Cadence;
-use Synthient\Enum\DomainStatus;
 use Synthient\Enum\NetworkType;
 
 final class LookupTest extends TestCase
@@ -48,14 +46,18 @@ final class LookupTest extends TestCase
         self::assertSame('/api/v4/lookup/ip/2001:db8::1', $this->request()->getUri()->getPath());
     }
 
-    public function testMissingSectionsAreNull(): void
+    public function testNullSectionsReadLikeMissingOnes(): void
     {
-        $client = $this->client([self::json(200, ['ip' => '10.0.0.1', 'network' => null])]);
-        $info = $client->lookupIp('10.0.0.1');
+        $client = $this->client([
+            self::json(200, ['ip' => '10.0.0.1', 'network' => null, 'location' => null]),
+            self::json(200, ['ip' => '10.0.0.1']),
+        ]);
 
-        self::assertNull($info->network);
-        self::assertNull($info->location);
-        self::assertNull($info->intelligence);
+        foreach ([$client->lookupIp('10.0.0.1'), $client->lookupIp('10.0.0.1')] as $info) {
+            self::assertNull($info->network);
+            self::assertNull($info->location);
+            self::assertNull($info->intelligence);
+        }
     }
 
     /**
@@ -163,50 +165,5 @@ final class LookupTest extends TestCase
         $client->lookupIp('8.8.8.8');
 
         self::assertSame([CURLOPT_FRESH_CONNECT => true, CURLOPT_PROXY => 'http://proxy.test:3128'], $this->history[0]['options']['curl'] ?? null);
-    }
-
-    public function testLookupDomain(): void
-    {
-        $client = $this->client([self::json(200, Fixtures::domain()), self::json(200, Fixtures::domain()), self::json(200, Fixtures::domain())]);
-        $domain = $client->lookupDomain('example.com', limit: 10);
-        $client->lookupDomain('a/b?c d');
-        $client->lookupDomain('example.com', limit: 5000);
-
-        self::assertSame(self::BASE_URL . '/lookup/domain/example.com?limit=10', (string) $this->request(0)->getUri());
-        self::assertSame('/api/v4/lookup/domain/a%2Fb%3Fc%20d', $this->request(1)->getUri()->getPath());
-        self::assertSame('', $this->request(1)->getUri()->getQuery());
-        self::assertSame('limit=5000', $this->request(2)->getUri()->getQuery());
-        self::assertSame(DomainStatus::ACTIVE, $domain->status);
-        self::assertSame(Cadence::BURST_DRIVEN, $domain->activityStats->cadence);
-        self::assertSame(5, $domain->stats->events24h);
-        self::assertSame([0, 1, 1], $domain->uniqueIps->sparkline24h);
-        self::assertCount(7, $domain->hourDowHeatmap);
-        self::assertCount(24, $domain->hourDowHeatmap[6]);
-        self::assertNotNull($domain->topAsn);
-        self::assertSame(4_294_967_295, $domain->topAsn->asn);
-        self::assertSame('203.0.113.7', $domain->recentEvents[0]->sourceIp);
-        self::assertEquals(new DateTimeImmutable('@1759968000'), $domain->timeSeries[0]->date);
-    }
-
-    public function testInactiveDomainHasNoTopAsn(): void
-    {
-        $body = Fixtures::domain();
-        unset($body['top_asn']);
-        $body['status'] = 'inactive';
-        $domain = $this->client([self::json(200, $body)])->lookupDomain('example.com');
-
-        self::assertSame(DomainStatus::INACTIVE, $domain->status);
-        self::assertNull($domain->topAsn);
-    }
-
-    public function testLookupDomainValidatesBeforeSending(): void
-    {
-        $client = $this->client([]);
-        foreach (['', '.', '..'] as $domain) {
-            self::thrown(InvalidArgumentException::class, static fn() => $client->lookupDomain($domain));
-        }
-        self::thrown(InvalidArgumentException::class, static fn() => $client->lookupDomain('example.com', limit: 0));
-        self::thrown(InvalidArgumentException::class, static fn() => $client->lookupDomain('example.com', limit: -1));
-        self::assertSame([], $this->history);
     }
 }

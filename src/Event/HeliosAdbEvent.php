@@ -14,11 +14,13 @@ final readonly class HeliosAdbEvent
      * @param int $sequentialId the command's 1-based position in its session
      * @param string $command the command as text; invalid UTF-8 becomes U+FFFD
      * @param string $hash the hex SHA-256 of the session's payload, shared by every command in the session
+     * @param HeliosMeta|null $meta null from sensors that do not send it yet
      */
     public function __construct(
         public string $session,
         public int $sequentialId,
         public string $command,
         public string $hash,
+        public ?HeliosMeta $meta = null,
     ) {}
 }

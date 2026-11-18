@@ -27,6 +27,22 @@ final class AccountTest extends TestCase
         self::assertSame('+00:00', $account->apiKey->createdAt->format('P'));
     }
 
+    public function testNewAndUnknownScopesDecode(): void
+    {
+        $body = Fixtures::account();
+        $body['scopes'] = ['GEOLOCATION_FEED', 'WHOIS_FEED', 'WHOIS_STREAM', 'HELIOS', 'NETWORK_IOCS_FEED', 'FILE_IOCS_STREAM', 'SOMETHING_NEW'];
+        $account = $this->client([self::json(200, $body)])->account();
+
+        self::assertSame([Scope::GEOLOCATION_FEED, Scope::WHOIS_FEED, Scope::WHOIS_STREAM, Scope::HELIOS, Scope::NETWORK_IOCS_FEED, Scope::FILE_IOCS_STREAM, 'SOMETHING_NEW'], $account->scopes);
+    }
+
+    public function testDeletedApiKeyIsNull(): void
+    {
+        $client = $this->client([self::json(200, ['api_key' => null] + Fixtures::account())]);
+
+        self::assertNull($client->account()->apiKey);
+    }
+
     public function testAccountWithOffsetTimestampIsConvertedToUtc(): void
     {
         $body = Fixtures::account();

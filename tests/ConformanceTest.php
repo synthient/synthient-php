@@ -10,6 +10,7 @@ use GuzzleHttp\Promise\PromiseInterface;
 use GuzzleHttp\Psr7\Response;
 use Psr\Http\Message\RequestInterface;
 use ReflectionClass;
+use ReflectionClassConstant;
 use ReflectionParameter;
 use Synthient\Client;
 use Synthient\Enum;
@@ -35,19 +36,13 @@ final class ConformanceTest extends TestCase
         'IntelligenceInfo' => Model\Intelligence::class,
         'ProviderEntry' => Model\Provider::class,
         'DeviceInfo' => Model\Device::class,
-        'DomainLookupResponse' => Model\DomainInfo::class,
-        'Stats' => Model\DomainStats::class,
-        'UniqueIPsBlock' => Model\UniqueIps::class,
-        'TimeSeriesEntry' => Model\TimeSeriesPoint::class,
-        'ASNEntry' => Model\AsnCount::class,
-        'SubdomainEntry' => Model\SubdomainCount::class,
-        'PortEntry' => Model\PortCount::class,
-        'CountryEntry' => Model\CountryCount::class,
-        'ActivityStatsBlock' => Model\ActivityStats::class,
-        'RecentEvent' => Model\DomainEvent::class,
         'ExportListResponse' => Model\ExportPage::class,
         'ExportListItem' => Model\Export::class,
         'ExportMetaResponse' => Model\ExportMeta::class,
+        'ExportFormatFile' => Model\ExportFile::class,
+        'ExportEntityFile' => Model\ExportEntity::class,
+        'ExportDailyResponse' => Model\ExportVolume::class,
+        'ExportDailyItem' => Model\ExportVolumeDay::class,
         'Schema' => Model\ParquetSchema::class,
         'ProjectedColumn' => Model\ParquetColumn::class,
         'ProxyStreamEntry' => Event\ProxyEvent::class,
@@ -69,14 +64,19 @@ final class ConformanceTest extends TestCase
     /** Schemas the SDK handles without a model: the batch request body and the errors. */
     private const array UNMODELED = ['IpBatchRequest', 'ProblemDetails', 'ValidationProblemDetails'];
 
+    /** Deprecated constants, such as Scope::ADMIN_PROXIES, are left out until the next major version removes them. */
     private const array VALUE_SETS = [
         'AccountInfoResponse.scopes' => Enum\Scope::class,
-        'ActivityStatsBlock.cadence' => Enum\Cadence::class,
         'AnonymizerStreamEntry.type' => Enum\ProxyType::class,
         'DeviceInfo.os' => Enum\OperatingSystem::class,
-        'DomainLookupResponse.status' => Enum\DomainStatus::class,
+        'ExportDailyItem.kind' => Enum\ExportKind::class,
+        'ExportEntityFile.entity' => Enum\WhoisEntity::class,
+        'ExportFormatFile.format' => Enum\ExportFormat::class,
         'ExportListItem.kind' => Enum\ExportKind::class,
+        'ExportMetaResponse.format' => Enum\ExportFormat::class,
         'ExportMetaResponse.kind' => Enum\ExportKind::class,
+        'HoneypotDNSStreamEntry.transport' => Enum\HeliosTransport::class,
+        'HoneypotHTTPSStreamEntry.transport' => Enum\HeliosTransport::class,
         'JA4TStreamEntry.type' => Enum\ProxyType::class,
         'NetworkInfo.type' => Enum\NetworkType::class,
         'Organization.relation' => Enum\Relation::class,
@@ -152,9 +152,43 @@ final class ConformanceTest extends TestCase
 
         self::assertSame(array_keys($expected), array_keys($found));
         foreach ($found as $path => $values) {
-            self::assertSame($values, array_values((new ReflectionClass($expected[$path]))->getConstants()), $path);
+            self::assertSame($values, self::constants($expected[$path]), $path);
         }
     }
+
+    public function testParameterValueSetsMatchTheSpec(): void
+    {
+        foreach (self::spec()['paths'] as $path => $operations) {
+            foreach ($operations as $operation) {
+                foreach ($operation['parameters'] ?? [] as $parameter) {
+                    $values = $parameter['schema']['enum'] ?? [];
+                    match ($parameter['name']) {
+                        'variant' => self::assertSame($values, self::constants(Enum\ExportVariant::class), $path),
+                        'format' => self::assertSame([], array_diff($values, self::constants(Enum\ExportFormat::class)), $path),
+                        default => null,
+                    };
+                }
+            }
+        }
+    }
+
+    /**
+     * @param class-string $class
+     *
+     * @return list<mixed>
+     */
+    private static function constants(string $class): array
+    {
+        $current = array_filter(
+            (new ReflectionClass($class))->getReflectionConstants(),
+            static fn(ReflectionClassConstant $constant) => !str_contains((string) $constant->getDocComment(), '@deprecated'),
+        );
+
+        return array_values(array_map(static fn(ReflectionClassConstant $constant) => $constant->getValue(), $current));
+    }
+
+    /** Operations the SDK still supports although the spec dropped them. */
+    private const array DEPRECATED_OPERATIONS = ['GET /api/v4/lookup/domain/example.com'];
 
     public function testEveryOperationIsCovered(): void
     {
@@ -163,12 +197,12 @@ final class ConformanceTest extends TestCase
             foreach (array_keys($operations) as $method) {
                 $expected[] = strtoupper($method) . ' /api/v4' . strtr($path, [
                     '{ip_address}' => '8.8.8.8',
-                    '{domain}' => 'example.com',
                     '{date}' => '2026-05-03',
                     '{hour}' => '7',
                 ]);
             }
         }
+        self::assertCount(68, $expected);
 
         $handler = static function (RequestInterface $request): PromiseInterface {
             $path = $request->getUri()->getPath();
@@ -177,6 +211,7 @@ final class ConformanceTest extends TestCase
                 str_ends_with($path, '/stream') => new Response(200, [], ''),
                 str_ends_with($path, '/meta') => self::json(200, Fixtures::exportMeta()),
                 str_ends_with($path, '/export') => self::json(200, Fixtures::exportPage([])),
+                str_ends_with($path, '/export/daily') => self::json(200, Fixtures::exportVolume()),
                 str_contains($path, '/export/') => new Response(307, ['Location' => 'https://storage.test/a']),
                 str_ends_with($path, '/account/me') => self::json(200, Fixtures::account()),
                 str_ends_with($path, '/health') => self::json(200, ['status' => 'ok']),
@@ -194,17 +229,24 @@ final class ConformanceTest extends TestCase
         $client->lookupDomain('example.com');
         foreach (self::feeds($client) as $feed) {
             $feed->listExports();
+            $feed->exportVolume();
             $feed->exportMeta('2026-05-03');
             $feed->exportMeta('2026-05-03/7');
             $feed->downloadUrl('2026-05-03');
             $feed->downloadUrl('2026-05-03/7');
             iterator_to_array($feed->stream());
         }
+        foreach (self::datasets($client) as $dataset) {
+            $dataset->listExports();
+            $dataset->exportVolume();
+            $dataset->exportMeta('2026-05-03');
+            $dataset->downloadUrl('2026-05-03');
+        }
         $sent = array_map(static fn(array $entry) => $entry['request']->getMethod() . ' ' . $entry['request']->getUri()->getPath(), $this->history);
 
+        $expected = [...$expected, ...self::DEPRECATED_OPERATIONS];
         sort($expected);
         sort($sent);
-        self::assertCount(53, $expected);
         self::assertSame($expected, $sent);
     }
 
@@ -219,16 +261,17 @@ final class ConformanceTest extends TestCase
         $required = $schema['required'] ?? [];
         \assert(\is_array($required));
         $keys = [];
-        foreach (Decoder::fields($class) as ['param' => $param, 'key' => $key, 'type' => $type, 'nullable' => $nullable]) {
+        foreach (Decoder::fields($class) as ['param' => $param, 'key' => $key, 'type' => $type]) {
             $keys[] = $key;
             $at = "{$name}.{$key}";
             self::assertArrayHasKey($key, $properties, "{$at} is not in the spec");
             $definition = $properties[$key];
             \assert(\is_array($definition));
 
-            self::assertSame(!\in_array($key, $required, true) || ($definition['nullable'] ?? false), $nullable, "{$at} nullability");
-            if ($nullable) {
-                self::assertTrue((new ReflectionParameter([$class, '__construct'], $param))->isDefaultValueAvailable(), "{$at} should default to null");
+            $parameter = new ReflectionParameter([$class, '__construct'], $param);
+            self::assertSame(!\in_array($key, $required, true) || ($definition['nullable'] ?? false), $parameter->allowsNull(), "{$at} nullability");
+            if ($parameter->allowsNull()) {
+                self::assertTrue($parameter->isDefaultValueAvailable(), "{$at} should default to null");
             }
             $timestamp = ($definition['type'] ?? null) === 'integer' && \in_array($key, ['timestamp', 'last_seen', 'created_at', 'date'], true);
             self::assertContains($type, $timestamp ? [DateTimeImmutable::class] : self::phpTypes($definition), "{$at} type");

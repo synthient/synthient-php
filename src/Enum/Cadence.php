@@ -6,6 +6,9 @@ namespace Synthient\Enum;
 
 /**
  * The activity pattern of a domain over the last 30 days, as a sentence.
+ *
+ * @deprecated Domain lookup was removed from the Synthient API and will stop working when the
+ *             endpoint is turned off. It will be removed in the next major version.
  */
 final class Cadence
 {

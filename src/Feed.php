@@ -4,18 +4,15 @@ declare(strict_types=1);
 
 namespace Synthient;
 
-use DateTimeImmutable;
 use DateTimeInterface;
-use DateTimeZone;
 use Generator;
-use InvalidArgumentException;
 use Psr\Http\Message\StreamInterface;
-use Synthient\Exception\SynthientException;
-use Synthient\Internal\RetryPolicy;
+use Synthient\Internal\Exports;
 use Synthient\Internal\Transport;
 use Synthient\Model\Export;
 use Synthient\Model\ExportMeta;
 use Synthient\Model\ExportPage;
+use Synthient\Model\ExportVolume;
 
 /**
  * A Synthient data feed, with a real-time stream and daily and hourly Parquet exports.
@@ -29,10 +26,17 @@ use Synthient\Model\ExportPage;
  * An hourly export can be fetched until its day's rollup, shortly after 00:30 UTC the next
  * day; a daily export still rolling up answers 404 with a retryAfter.
  *
+ * Proxies, anonymizers, and ja4t also publish a deduplicated lite file of each export. Pass
+ * ExportVariant::LITE as variant to list or fetch it, which answers 404 until it is published.
+ * A lite listing's IDs name the full files, so pass the variant again to fetch one. The other
+ * feeds have no lite files.
+ *
  * @template T of object
  */
 final readonly class Feed
 {
+    private Exports $exports;
+
     /**
      * @internal
      *
@@ -42,7 +46,9 @@ final readonly class Feed
         private Transport $transport,
         private string $path,
         private string $event,
-    ) {}
+    ) {
+        $this->exports = new Exports($transport, $path, true);
+    }
 
     /**
      * Connects at once, so errors such as a missing scope (403) or too many open streams (429)
@@ -61,19 +67,17 @@ final readonly class Feed
      * @param int|null $limit the page size, at least 1; the API defaults to 100 and clamps
      *                        values above 500
      * @param string|null $cursor the nextCursor of the previous page
+     * @param string|DateTimeInterface|null $day only that UTC day's exports, as YYYY-MM-DD or
+     *                                           the day of a DateTimeInterface
+     * @param string|null $variant lite to list the lite files, see ExportVariant
      */
-    public function listExports(?int $limit = null, ?string $cursor = null): ExportPage
-    {
-        self::checkLimit($limit);
-        $query = [];
-        if ($cursor !== null && $cursor !== '') {
-            $query['cursor'] = $cursor;
-        }
-        if ($limit !== null) {
-            $query['limit'] = $limit;
-        }
-
-        return $this->transport->request(ExportPage::class, 'GET', "{$this->path}/export", RetryPolicy::Transient, $query);
+    public function listExports(
+        ?int $limit = null,
+        ?string $cursor = null,
+        string|DateTimeInterface|null $day = null,
+        ?string $variant = null,
+    ): ExportPage {
+        return $this->exports->page($limit, $cursor, ['day' => $day, 'variant' => $variant]);
     }
 
     /**
@@ -82,86 +86,53 @@ final readonly class Feed
      *
      * @return Generator<int, Export>
      */
-    public function allExports(?int $limit = null, ?string $cursor = null): Generator
-    {
-        self::checkLimit($limit);
-
-        return $this->pages($limit, $cursor);
+    public function allExports(
+        ?int $limit = null,
+        ?string $cursor = null,
+        string|DateTimeInterface|null $day = null,
+        ?string $variant = null,
+    ): Generator {
+        return $this->exports->all($limit, $cursor, ['day' => $day, 'variant' => $variant]);
     }
 
     /**
-     * @return Generator<int, Export>
+     * Returns the rows and bytes exported per UTC day, oldest first.
+     *
+     * @param int|null $days how many days back, today included; the API defaults to 90 and
+     *                       accepts 1 to 366
      */
-    private function pages(?int $limit, ?string $cursor): Generator
+    public function exportVolume(?int $days = null): ExportVolume
     {
-        $seen = $cursor === null ? [] : [$cursor => true];
-        while (true) {
-            $page = $this->listExports($limit, $cursor);
-            foreach ($page->exports as $export) {
-                yield $export;
-            }
-            $cursor = $page->nextCursor;
-            if ($cursor === null || $cursor === '') {
-                return;
-            }
-            if (isset($seen[$cursor])) {
-                throw new SynthientException('synthient: export listing returned a repeated cursor');
-            }
-            $seen[$cursor] = true;
-        }
+        return $this->exports->volume($days);
     }
 
-    public function exportMeta(string|DateTimeInterface $export): ExportMeta
+    /**
+     * @param string|null $variant lite for the lite file, see ExportVariant
+     */
+    public function exportMeta(string|DateTimeInterface $export, ?string $variant = null): ExportMeta
     {
-        $path = "{$this->path}/export/" . self::exportId($export) . '/meta';
-
-        return $this->transport->request(ExportMeta::class, 'GET', $path, RetryPolicy::Transient);
+        return $this->exports->meta($export, ['variant' => $variant]);
     }
 
     /**
      * Returns the presigned URL of an export's file. It is valid for 24 hours and grants
      * access without an API key, so treat it as a secret.
+     *
+     * @param string|null $variant lite for the lite file, see ExportVariant
      */
-    public function downloadUrl(string|DateTimeInterface $export): string
+    public function downloadUrl(string|DateTimeInterface $export, ?string $variant = null): string
     {
-        return $this->transport->downloadUrl("{$this->path}/export/" . self::exportId($export));
+        return $this->exports->downloadUrl($export, ['variant' => $variant]);
     }
 
     /**
      * Opens an export's Parquet file for reading. The caller must close the stream. Compare
      * the file's SHA-256 with the export's checksum to verify it.
+     *
+     * @param string|null $variant lite for the lite file, see ExportVariant
      */
-    public function download(string|DateTimeInterface $export): StreamInterface
+    public function download(string|DateTimeInterface $export, ?string $variant = null): StreamInterface
     {
-        return $this->transport->openDownload("{$this->path}/export/" . self::exportId($export));
-    }
-
-    private static function checkLimit(?int $limit): void
-    {
-        if ($limit !== null && $limit < 1) {
-            throw new InvalidArgumentException('limit must be at least 1');
-        }
-    }
-
-    private static function exportId(string|DateTimeInterface $export): string
-    {
-        if ($export instanceof DateTimeInterface) {
-            return DateTimeImmutable::createFromInterface($export)
-                ->setTimezone(new DateTimeZone('UTC'))
-                ->format('Y-m-d');
-        }
-        if ($export === 'latest') {
-            return $export;
-        }
-        if (
-            preg_match('#^(\d{4})-(\d{2})-(\d{2})(?:/(\d{1,2}))?$#', $export, $match) !== 1
-            || !checkdate((int) $match[2], (int) $match[3], (int) $match[1])
-            || (int) ($match[4] ?? 0) > 23
-        ) {
-            throw new InvalidArgumentException('invalid export ID');
-        }
-        $date = "{$match[1]}-{$match[2]}-{$match[3]}";
-
-        return isset($match[4]) ? $date . '/' . (int) $match[4] : $date;
+        return $this->exports->download($export, ['variant' => $variant]);
     }
 }

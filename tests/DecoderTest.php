@@ -11,6 +11,7 @@ use Synthient\Exception\SynthientException;
 use Synthient\Internal\Decoder;
 use Synthient\Model\Account;
 use Synthient\Model\IpInfo;
+use Synthient\Model\ParquetSchema;
 
 final class DecoderTest extends TestCase
 {
@@ -134,6 +135,13 @@ final class DecoderTest extends TestCase
             $e = self::thrown(SynthientException::class, static fn() => Decoder::decode(HeliosDnsEvent::class, $event($id)));
             self::assertStringContainsString('tunnel_id must be an unsigned integer', $e->getMessage(), $id);
         }
+    }
+
+    public function testDefaultsFillAbsentAndNullFields(): void
+    {
+        self::assertSame([], Decoder::decode(ParquetSchema::class, '{"fields":null}')->fields);
+        self::assertSame([], Decoder::decode(ParquetSchema::class, '{}')->fields);
+        self::assertSame('', Decoder::decode(HeliosDnsEvent::class, '{"timestamp":1,"tunnel_id":1,"domain":"a","port":53,"protocol":"dns","meta":{}}')->transport);
     }
 
     public function testIgnoresUnknownFieldsAtEveryLevel(): void

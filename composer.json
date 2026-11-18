@@ -1,6 +1,6 @@
 {
     "name": "synthient/synthient-php",
-    "description": "The official PHP client for the Synthient API: IP and domain intelligence, account details, and real-time and bulk data feeds.",
+    "description": "The official PHP client for the Synthient API: IP intelligence, account details, and real-time and bulk data feeds.",
     "type": "library",
     "license": "Apache-2.0",
     "keywords": [

@@ -9,6 +9,7 @@ use GuzzleHttp\Psr7\Response;
 use GuzzleHttp\Psr7\Utils;
 use LogicException;
 use Psr\Http\Message\StreamInterface;
+use Synthient\Enum\HeliosTransport;
 use Synthient\Enum\ProxyType;
 use Synthient\EventStream;
 use Synthient\Exception\ApiException;
@@ -98,6 +99,81 @@ final class StreamTest extends TestCase
         )])->heliosAdb->stream());
         self::assertSame('id', $adb[0]->command);
         self::assertSame(1, $adb[0]->sequentialId);
+    }
+
+    public function testHeliosAdbMeta(): void
+    {
+        $command = '"session":"' . str_repeat('a', 32) . '","sequential_id":3,"command":"id","hash":"' . str_repeat('b', 64) . '"';
+        $events = iterator_to_array($this->client([self::ndjson(
+            "{{$command},\"meta\":{\"proxy_ip\":\"203.0.113.10\",\"server\":\"hp-eu-1\",\"pool_id\":\"prod\",\"provider\":\"luminati\"}}\n"
+            . "{{$command},\"meta\":null}\n",
+        )])->heliosAdb->stream());
+
+        self::assertSame('203.0.113.10', $events[0]->meta?->proxyIp);
+        self::assertSame('hp-eu-1', $events[0]->meta->server);
+        self::assertSame('prod', $events[0]->meta->poolId);
+        self::assertSame('luminati', $events[0]->meta->provider);
+        self::assertNull($events[1]->meta);
+    }
+
+    public function testHeliosTransport(): void
+    {
+        $event = static fn(string $protocol, string $transport): string => '{"timestamp":1714780800123,"tunnel_id":9,"domain":"example.com","port":443,"protocol":"' . $protocol . '","meta":{},"transport":"' . $transport . '"}' . "\n";
+        $dns = iterator_to_array($this->client([self::ndjson($event('dns', 'tcp') . $event('dns', 'sctp'))])->heliosDns->stream());
+        $https = iterator_to_array($this->client([self::ndjson($event('https', 'quic'))])->heliosHttps->stream());
+
+        self::assertSame(HeliosTransport::TCP, $dns[0]->transport);
+        self::assertSame('sctp', $dns[1]->transport);
+        self::assertSame(HeliosTransport::QUIC, $https[0]->transport);
+    }
+
+    public function testTlsClientHelloFields(): void
+    {
+        $details = [
+            'record_version' => 'TLS 1.0',
+            'record_version_code' => 769,
+            'handshake_version' => 'TLS 1.2',
+            'handshake_version_code' => 771,
+            'supported_version_codes' => [2570, 772, 771],
+            'alpn_hex' => ['6832', '687474702f312e31'],
+            'signature_algorithms_cert' => [['code' => 2052, 'name' => 'rsa_pss_rsae_sha256']],
+            'record_size_limit' => 16385,
+            'max_fragment_length' => 4,
+            'complete' => false,
+            'truncated' => true,
+            'transport' => 'tcp',
+        ];
+        $event = static fn(array $details): string => json_encode([
+            'timestamp' => 1_714_780_800_123,
+            'tunnel_id' => 9,
+            'domain' => 'example.com',
+            'port' => 443,
+            'protocol' => 'https',
+            'meta' => ['proxy_ip' => '203.0.113.10'],
+            'transport' => 'tcp',
+            'details' => $details,
+        ], JSON_THROW_ON_ERROR) . "\n";
+        $events = iterator_to_array($this->client([self::ndjson($event($details) . $event(['sni' => 'example.com']))])->heliosHttps->stream());
+
+        $full = $events[0]->details;
+        self::assertNotNull($full);
+        self::assertSame(769, $full->recordVersionCode);
+        self::assertSame(771, $full->handshakeVersionCode);
+        self::assertSame([2570, 772, 771], $full->supportedVersionCodes);
+        self::assertSame(['6832', '687474702f312e31'], $full->alpnHex);
+        self::assertSame('rsa_pss_rsae_sha256', $full->signatureAlgorithmsCert[0]->name ?? null);
+        self::assertSame(16385, $full->recordSizeLimit);
+        self::assertSame(4, $full->maxFragmentLength);
+        self::assertFalse($full->complete);
+        self::assertTrue($full->truncated);
+        self::assertSame(HeliosTransport::TCP, $full->transport);
+
+        $bare = $events[1]->details;
+        self::assertNotNull($bare);
+        self::assertSame('example.com', $bare->sni);
+        foreach (['complete', 'truncated', 'transport', 'recordVersionCode', 'handshakeVersionCode', 'supportedVersionCodes', 'alpnHex', 'signatureAlgorithmsCert', 'recordSizeLimit', 'maxFragmentLength'] as $field) {
+            self::assertNull($bare->{$field}, $field);
+        }
     }
 
     public function testConnectErrorsAreThrownBeforeIteration(): void

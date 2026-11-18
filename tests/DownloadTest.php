@@ -31,6 +31,18 @@ final class DownloadTest extends TestCase
         self::assertSame(self::KEY, $this->request()->getHeaderLine('X-Api-Key'));
     }
 
+    public function testNotModifiedIsNotARedirect(): void
+    {
+        $client = $this->client([new Response(304, ['Last-Modified' => 'Tue, 17 Nov 2026 03:00:00 GMT']), new Response(304)]);
+
+        foreach ([static fn() => $client->proxies->downloadUrl('latest'), static fn() => $client->geolocation->download('latest')] as $call) {
+            $e = self::thrown(SynthientException::class, $call);
+            self::assertNotInstanceOf(ApiException::class, $e);
+            self::assertStringContainsString('expected a redirect to the export, got status 304', $e->getMessage());
+        }
+        self::assertCount(2, $this->history);
+    }
+
     public function testRelativeLocationsResolveAgainstTheApi(): void
     {
         $url = $this->client([self::redirect('/files/a.parquet')])->proxies->downloadUrl('latest');

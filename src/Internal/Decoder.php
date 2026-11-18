@@ -14,10 +14,11 @@ use Synthient\Exception\SynthientException;
 /**
  * Builds models from JSON by checking each value against the model constructor's types.
  *
- * Required fields must be present with the exact JSON type, without coercion. Nullable
- * parameters accept an absent or null field. Unknown fields are ignored. Integer timestamps
- * of at least 1e12 are read as milliseconds and smaller ones as seconds; string timestamps
- * must be RFC 3339. Errors name the field path and never include values or map keys.
+ * Fields must have the exact JSON type, without coercion. A field whose parameter has a
+ * default, such as null, may be absent or null and then takes the default. Every other field
+ * is required. Unknown fields are ignored. Integer timestamps of at least 1e12 are read as
+ * milliseconds and smaller ones as seconds; string timestamps must be RFC 3339. Errors name
+ * the field path and never include values or map keys.
  *
  * JSON is decoded into arrays because PHP objects cannot hold every valid key, so an empty
  * object and an empty list are each accepted for the other.
@@ -28,7 +29,7 @@ final class Decoder
 {
     private const string RFC3339 = '/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,9})?(Z|[+-]\d{2}:\d{2})$/i';
 
-    /** @var array<class-string, list<array{param: string, key: string, type: string, nullable: bool}>> */
+    /** @var array<class-string, list<array{param: string, key: string, type: string, optional: bool}>> */
     private static array $fields = [];
 
     private static ?DateTimeZone $utc = null;
@@ -76,10 +77,11 @@ final class Decoder
         foreach (self::$fields[$class] ??= self::fields($class) as $field) {
             $at = $path === '' ? $field['key'] : "{$path}.{$field['key']}";
             $value = $data[$field['key']] ?? null;
-            if ($value === null && !$field['nullable']) {
+            if ($value !== null) {
+                $args[$field['param']] = self::value($field['type'], $value, $at);
+            } elseif (!$field['optional']) {
                 throw new SynthientException("synthient: invalid response: {$at} is missing");
             }
-            $args[$field['param']] = $value === null ? null : self::value($field['type'], $value, $at);
         }
 
         return new $class(...$args);
@@ -169,7 +171,7 @@ final class Decoder
     /**
      * @param class-string $class
      *
-     * @return list<array{param: string, key: string, type: string, nullable: bool}>
+     * @return list<array{param: string, key: string, type: string, optional: bool}>
      */
     public static function fields(string $class): array
     {
@@ -189,7 +191,7 @@ final class Decoder
                     $wire?->list !== null => "list<{$wire->list}>",
                     default => $type->getName(),
                 },
-                'nullable' => $type->allowsNull(),
+                'optional' => $param->isDefaultValueAvailable(),
             ];
         }
 

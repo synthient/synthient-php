@@ -110,6 +110,7 @@ final class Fixtures
             'checksum' => str_repeat('ab', 32),
             'created_at' => (new DateTimeImmutable("{$date}T00:00:00Z"))->getTimestamp() + ($hour === null ? 86400 : ($hour + 1) * 3600),
             'download_path' => "/api/v4/feeds/proxies/export/{$id}",
+            'formats' => [['format' => 'parquet', 'size_bytes' => 1024, 'checksum' => str_repeat('ab', 32)]],
         ];
         if ($hour !== null) {
             $export['hour'] = $hour;
@@ -150,6 +151,57 @@ final class Fixtures
             'checksum' => str_repeat('ab', 32),
             'created_at' => 1_777_795_200,
             'schema' => ['fields' => [['name' => 'ip', 'type' => 'string'], ['name' => 'asn', 'type' => 'uint32']]],
+            'formats' => [['format' => 'parquet', 'size_bytes' => 1024, 'checksum' => str_repeat('ab', 32)]],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function whoisMeta(): array
+    {
+        return [
+            'id' => 'latest',
+            'stream' => 'whois',
+            'kind' => 'daily',
+            'format' => 'tar.gz',
+            'date' => 1_794_873_600,
+            'rows' => 6_583_438,
+            'size' => 997_234_948,
+            'checksum' => str_repeat('ad', 32),
+            'created_at' => 1_794_960_929,
+            'schema' => ['fields' => []],
+            'formats' => [['format' => 'tar.gz', 'size_bytes' => 997_234_948, 'checksum' => str_repeat('ad', 32)]],
+            'entities' => [
+                [
+                    'entity' => 'asns',
+                    'row_count' => 123_778,
+                    'size_bytes' => 5_442_736,
+                    'checksum' => str_repeat('06', 32),
+                    'schema' => ['fields' => [['name' => 'asn', 'type' => 'int64'], ['name' => 'updated', 'type' => 'timestamp']]],
+                ],
+                [
+                    'entity' => 'contacts',
+                    'row_count' => 6_459_660,
+                    'size_bytes' => 205_447_373,
+                    'checksum' => str_repeat('cf', 32),
+                    'schema' => ['fields' => [['name' => 'emails', 'type' => 'list<string>']]],
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function exportVolume(): array
+    {
+        return [
+            'stream' => 'proxies',
+            'days' => [
+                ['date' => '2026-11-16', 'kind' => 'daily', 'snapshots' => 1, 'row_count' => 1_440_452_210, 'size_bytes' => 19_629_681_638],
+                ['date' => '2026-11-18', 'kind' => 'hourly', 'snapshots' => 3, 'row_count' => 64_417_250, 'size_bytes' => 880_000_000],
+            ],
         ];
     }
 }

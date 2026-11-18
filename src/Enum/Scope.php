@@ -30,5 +30,32 @@ final class Scope
     public const string JA4_STREAM = 'JA4_STREAM';
     public const string JA4T_FEED = 'JA4T_FEED';
     public const string JA4T_STREAM = 'JA4T_STREAM';
+
+    /** A dashboard permission that authorizes no API operation. */
+    public const string HELIOS = 'HELIOS';
+
+    public const string WHOIS_FEED = 'WHOIS_FEED';
+
+    /** Reserved: no operation accepts it yet. */
+    public const string WHOIS_STREAM = 'WHOIS_STREAM';
+
+    public const string GEOLOCATION_FEED = 'GEOLOCATION_FEED';
+
+    /** Reserved for an upcoming network IOC feed. */
+    public const string NETWORK_IOCS_FEED = 'NETWORK_IOCS_FEED';
+
+    /** Reserved for an upcoming network IOC feed. */
+    public const string NETWORK_IOCS_STREAM = 'NETWORK_IOCS_STREAM';
+
+    /** Reserved for an upcoming file IOC feed. */
+    public const string FILE_IOCS_FEED = 'FILE_IOCS_FEED';
+
+    /** Reserved for an upcoming file IOC feed. */
+    public const string FILE_IOCS_STREAM = 'FILE_IOCS_STREAM';
+
+    /**
+     * @deprecated It never authorized a public operation, and the API no longer lists it. It
+     *             will be removed in the next major version.
+     */
     public const string ADMIN_PROXIES = 'ADMIN_PROXIES';
 }

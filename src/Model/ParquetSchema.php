@@ -9,10 +9,10 @@ use Synthient\Internal\Wire;
 final readonly class ParquetSchema
 {
     /**
-     * @param list<ParquetColumn> $fields
+     * @param list<ParquetColumn> $fields the columns in order, empty for a WHOIS archive
      */
     public function __construct(
         #[Wire(list: ParquetColumn::class)]
-        public array $fields,
+        public array $fields = [],
     ) {}
 }

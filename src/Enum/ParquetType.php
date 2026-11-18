@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace Synthient\Enum;
 
 /**
- * The API may add values.
+ * The API may add values, and dataset schemas already use others, such as double, timestamp,
+ * and list<string>.
  */
 final class ParquetType
 {

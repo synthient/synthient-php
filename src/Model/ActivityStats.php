@@ -6,6 +6,9 @@ namespace Synthient\Model;
 
 /**
  * Patterns in a domain's hourly activity, in UTC.
+ *
+ * @deprecated Domain lookup was removed from the Synthient API and will stop working when the
+ *             endpoint is turned off. It will be removed in the next major version.
  */
 final readonly class ActivityStats
 {

@@ -16,6 +16,7 @@ final readonly class HeliosDnsEvent
      * @param string $tunnelId a uint64, as a decimal string because it can exceed PHP_INT_MAX
      * @param string $domain the host the tunnel was opened to
      * @param int $port the destination port
+     * @param string $transport the tunnel transport the event arrived over, see HeliosTransport
      */
     public function __construct(
         public DateTimeImmutable $timestamp,
@@ -25,5 +26,6 @@ final readonly class HeliosDnsEvent
         public int $port,
         public string $protocol,
         public HeliosMeta $meta,
+        public string $transport = '',
     ) {}
 }

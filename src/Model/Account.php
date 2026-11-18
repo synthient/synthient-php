@@ -13,7 +13,8 @@ final readonly class Account
 {
     /**
      * @param list<string> $scopes the permissions granted to the key, see Scope
-     * @param AccountApiKey|null $apiKey the key that made the request
+     * @param AccountApiKey|null $apiKey the key that made the request, or null if it was deleted
+     *                                   while the request was in flight
      */
     public function __construct(
         public string $email,

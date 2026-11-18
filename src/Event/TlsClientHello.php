@@ -25,6 +25,14 @@ final readonly class TlsClientHello
      * @param list<string>|null $keyShareGroups
      * @param list<string>|null $pskKeyExchangeModes
      * @param list<string>|null $compressCertificate
+     * @param bool|null $complete false when the sensor captured only part of the ClientHello
+     * @param bool|null $truncated true when the ClientHello was cut short
+     * @param string|null $transport the transport the handshake was read from, see HeliosTransport
+     * @param int|null $recordVersionCode $recordVersion as its wire code point
+     * @param int|null $handshakeVersionCode $handshakeVersion as its wire code point
+     * @param list<int>|null $supportedVersionCodes $supportedVersions as wire code points, GREASE included
+     * @param list<string>|null $alpnHex $alpn hex-encoded
+     * @param list<TlsCodeName>|null $signatureAlgorithmsCert
      */
     public function __construct(
         public ?string $recordVersion = null,
@@ -64,5 +72,18 @@ final readonly class TlsClientHello
         public ?bool $renegotiationInfo = null,
         public ?bool $signedCertificateTimestamps = null,
         public ?bool $statusRequest = null,
+        public ?bool $complete = null,
+        public ?bool $truncated = null,
+        public ?string $transport = null,
+        public ?int $recordVersionCode = null,
+        public ?int $handshakeVersionCode = null,
+        #[Wire(list: 'int')]
+        public ?array $supportedVersionCodes = null,
+        #[Wire(list: 'string')]
+        public ?array $alpnHex = null,
+        #[Wire(list: TlsCodeName::class)]
+        public ?array $signatureAlgorithmsCert = null,
+        public ?int $recordSizeLimit = null,
+        public ?int $maxFragmentLength = null,
     ) {}
 }
