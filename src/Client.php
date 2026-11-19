@@ -51,7 +51,7 @@ use Synthient\Model\IpInfo;
  */
 final class Client
 {
-    public const string VERSION = '1.0.0';
+    public const string VERSION = '1.1.0';
     public const string DEFAULT_BASE_URL = 'https://api.synthient.com/api/v4';
     public const int MAX_BATCH_SIZE = 1000;
 
